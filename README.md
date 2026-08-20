@@ -10,7 +10,7 @@
 
 [Validate in 5 minutes](docs/validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Harness integration](docs/harness-integration.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-> **Status: public pre-alpha / v0.3 validation candidate.** Core mission policy, receipts, local persistence, agent-instance authentication, one-time approvals, mutation idempotency, credential isolation, a protocol-neutral `guard.run()` API, harness action grants, GitHub brokered execution, and an MCP v2 policy gateway are implemented and covered by CI. Production OAuth onboarding, OS keychain backends, remote authenticated deployment, and additional provider adapters remain future work.
+> **Status: public pre-alpha / v0.3 validation milestone.** Core mission policy, receipts, local persistence, agent-instance authentication, one-time approvals, mutation idempotency, credential isolation, a protocol-neutral `guard.run()` API, harness action grants, GitHub brokered execution, and an MCP v2 policy gateway are implemented and covered by CI. Production OAuth onboarding, OS keychain backends, remote authenticated deployment, and additional provider adapters remain future work.
 
 </div>
 

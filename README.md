@@ -4,125 +4,66 @@
 
 # Agent Authority
 
-### Mission-scoped authorization for AI agents
+### The permission and credential control plane for AI agents
 
-**One human-approved mission. Any agent harness. Old and new authentication systems. Bounded authority, human approvals, delegation controls, and auditable action receipts.**
+**Connect accounts once. Give each agent a bounded mission. Keep long-lived credentials outside the model.**
 
-[Architecture](docs/architecture.md) · [Harness integration](docs/harness-integration.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Harness integration](docs/harness-integration.md) · [OpenClaw](docs/openclaw-integration.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-> **Status: early public architecture + executable MVP.** We are building this in public and actively welcome protocol, security, identity, MCP, OAuth, agent-runtime, connector, and UX contributions.
+> **Status: public pre-alpha / executable v0.2.** The policy runtime, persistent local authority home, encrypted local vault, GitHub provider boundary, CLI, sidecar API, delegation controls and receipts are implemented. Browser OAuth, additional native providers, production keychain backends and MCP proxying are still under active development.
 
 </div>
 
-## Why Agent Authority exists
+## Why Agent Authority
 
-AI agents increasingly need to work across GitHub, Google, Slack, Cloudflare, CRMs, cloud providers, MCP servers, CLIs, internal systems, and browser-only legacy applications.
+AI agents increasingly need GitHub, Google, Slack, Cloudflare, AWS, CRMs, MCP servers, CLIs and legacy applications. Today each harness tends to repeat authentication or receive broad credentials directly.
 
-Today the user is repeatedly forced to become the authentication bridge:
-
-```text
-agent needs GitHub      -> gh auth / OAuth
-agent needs Google      -> browser consent
-agent needs Cloudflare  -> API token
-agent needs old ERP     -> password/browser session
-agent needs MCP tool    -> another authorization flow
-```
-
-Agent Authority changes the abstraction.
-
-Instead of giving an agent broad credentials, a human authorizes a bounded **mission**. The authority runtime evaluates each requested action and returns one of:
+Agent Authority separates **account connection** from **agent permission**:
 
 ```text
-ALLOW
-DENY
-REQUIRE_APPROVAL
+Human connects GitHub once
+        |
+        v
+Agent Authority connection vault
+        |
+        +---- Codex mission A
+        +---- Claude Code mission B
+        +---- OpenClaw mission C
+        +---- custom/MCP agent mission D
 ```
 
-Only after the action is authorized does the runtime select the credential or transport adapter required by the underlying service.
+The account connection can persist for months. A mission can last minutes or hours and can restrict service, action, resource, budget, delegation depth and approval requirements.
+
+## Where it sits
+
+Agent Authority is **not another agent harness** and **not a replacement for OAuth or MCP**.
 
 ```text
-Human intent
-    |
-    v
-+----------------------+
-| Mission Manifest     |
-| who / why / limits   |
-+----------+-----------+
-           |
-           v
-+----------------------+
-| Authority Runtime    |
-| policy + delegation  |
-+----------+-----------+
-           |
-           v
-+----------------------+
-| Adapter Layer        |
-| OAuth | MCP | API    |
-| key   | CLI | legacy |
-+----------+-----------+
-           |
-           v
- GitHub / Google / Cloudflare / SaaS / internal tools / future protocols
+Human / organization
+        |
+        | missions + approvals
+        v
++---------------------------+
+|      Agent Authority      |
+| policy / vault / audit    |
++-------------+-------------+
+              ^
+              | authority API / SDK / plugin
+   +----------+----------+
+   |          |          |
+ Codex   Claude Code   OpenClaw / other agents
+   |          |          |
+   +----------+----------+
+              |
+              v
+      credential adapters
+ OAuth | MCP | API key | cloud IAM | CLI | browser
+              |
+              v
+ GitHub / Google / Cloudflare / AWS / SaaS / legacy
 ```
 
-## The core idea
-
-Authentication answers:
-
-> **Who is this actor?**
-
-Agent Authority additionally answers:
-
-> **Who authorized this agent, for what objective, with which limits, for how long, with what delegation rights, and which actions must return to a human?**
-
-The central object is a **Mission Manifest**, not a permanent API key.
-
-```json
-{
-  "version": "0.1",
-  "mission_id": "mission:deploy-nullsquare",
-  "principal": { "id": "user:example" },
-  "agent": { "id": "agent:coding:session-42", "harness": "local" },
-  "objective": "Deploy the approved release",
-  "resources": [
-    {
-      "service": "github",
-      "allow": ["repo.read", "repo.write", "pull_request.*"],
-      "deny": ["repo.delete", "billing.*"]
-    },
-    {
-      "service": "cloudflare",
-      "allow": ["workers.read", "workers.deploy"],
-      "deny": ["account.delete", "billing.*"]
-    }
-  ],
-  "constraints": {
-    "max_delegation_depth": 2,
-    "expires_at": "2026-08-20T22:00:00Z"
-  },
-  "approvals": [
-    {
-      "match": { "service": "cloudflare", "action": "dns.change" },
-      "required": true
-    }
-  ]
-}
-```
-
-## What makes this different
-
-Agent Authority is **not an OAuth replacement** and **not an MCP competitor**. It is intended to sit above authentication mechanisms and normalize *authority* across them.
-
-| Layer | Responsibility |
-|---|---|
-| Human / organization | Defines objective and approves authority |
-| **Agent Authority** | Mission, policy, delegation, approvals, receipts |
-| Identity/auth standards | OAuth, OIDC, MCP auth, workload identity, future agent auth |
-| Credential adapters | token exchange, vault reference, temporary CLI env, browser session |
-| Service | GitHub, Google, Cloudflare, internal API, legacy SaaS |
-
-A future authentication protocol should become another adapter rather than forcing the mission model to be rewritten.
+The universal baseline is a local sidecar/API. Native plugins are ergonomic integrations, not architectural requirements.
 
 ## Quick start
 
@@ -131,125 +72,202 @@ Requirements: Node.js 20+.
 ```bash
 git clone https://github.com/Null-Square/agent-authority.git
 cd agent-authority
-npm test
-npm run demo
+npm install
+npm link
+
+agent-authority setup
+agent-authority doctor
+agent-authority status
 ```
 
-Run the local authority sidecar:
+Run the local authority daemon:
 
 ```bash
-npm start
+agent-authority serve
+```
+
+Health check:
+
+```bash
 curl http://127.0.0.1:8787/health
 ```
 
+The daemon binds to loopback by default.
+
+## Connect once
+
+The first native provider is GitHub. The current safe developer onboarding flow reads the token from stdin so it does not appear in shell history:
+
+```bash
+printf %s "$GITHUB_TOKEN" | agent-authority connect github --token-stdin
+agent-authority connections
+```
+
+The credential is encrypted in the local Agent Authority vault and is not returned to agents. Browser/device OAuth is the next onboarding milestone so the final UX becomes simply:
+
+```text
+agent-authority connect github
+→ browser/device consent
+→ connected
+```
+
+See [CLI and configuration](docs/cli.md).
+
+## Local authority home
+
+By default:
+
+```text
+~/.agent-authority/
+  config.json
+  missions/
+  state/
+    connections.json
+    revocations.json
+    usage.json
+  vault/
+    master.key
+    secrets.enc.json
+  receipts/
+```
+
+Override with `AGENT_AUTHORITY_HOME` or `--home`.
+
+Secrets are not written to `config.json`, mission files, receipts or connection listings. The current encrypted-file vault is a local pre-alpha backend; OS keychain/KMS/HSM/enterprise vault backends are planned for production deployments.
+
+## Mission-scoped authority
+
+```json
+{
+  "version": "0.1",
+  "mission_id": "mission:fix-agent-authority",
+  "principal": { "id": "user:local" },
+  "agent": { "id": "agent:codex:session-42", "harness": "codex" },
+  "objective": "Fix the approved issue in Agent Authority",
+  "resources": [
+    {
+      "service": "github",
+      "allow": ["repo.read", "repo.contents.read", "repo.contents.write", "pull_request.create"],
+      "deny": ["repo.delete", "billing.*"],
+      "constraints": {
+        "repository": ["Null-Square/agent-authority"]
+      }
+    }
+  ],
+  "constraints": {
+    "max_delegation_depth": 1,
+    "expires_at": "2026-08-20T22:00:00Z"
+  }
+}
+```
+
+Validate or evaluate locally:
+
+```bash
+agent-authority mission validate mission.json
+agent-authority mission evaluate mission.json \
+  --service github \
+  --action repo.read \
+  --repository Null-Square/agent-authority
+```
+
+Every sensitive request resolves to:
+
+```text
+ALLOW
+DENY
+REQUIRE_APPROVAL
+```
+
+Only an allowed action reaches a credential/provider adapter.
+
+## Implemented now
+
+- mission validation and policy evaluation
+- explicit deny precedence
+- wildcard action scopes
+- resource/context constraints
+- expiry
+- cumulative mission budgets
+- delegation depth and child-authority attenuation
+- durable mission revocation
+- action receipts
+- persistent connection metadata
+- AES-256-GCM local encrypted secret store
+- durable usage state
+- CLI: setup, doctor, status, connections, serve, connect/disconnect GitHub, mission validate/evaluate
+- local HTTP sidecar
+- JavaScript SDK
+- strict GitHub REST action mapping
+- GitHub authenticated execution without returning the token to the model
+- OpenClaw/tool-wrapper integration example
+- automated tests and CI
+
+## Next production milestones
+
+1. **Browser/device OAuth onboarding** — GitHub first, then a reusable OAuth/OIDC engine for Google/Microsoft/Slack.
+2. **Pluggable secure key stores** — macOS Keychain, Windows Credential Manager/DPAPI, Linux Secret Service, remote KMS/HSM/vault.
+3. **Authenticated local transport** — bind agent instances to the authority daemon instead of trusting any localhost process.
+4. **Human approval service** — terminal first, then web/mobile/passkey approval.
+5. **MCP authority proxy** — make existing MCP servers authority-aware without rewriting each server.
+6. **Provider capability registry** — normalized capabilities plus provider-specific mappings.
+7. **Append-only receipt/audit store** and signed mission/receipt experiments.
+8. **Installer, releases and upgrade channel** for npm/binaries.
+9. **Threat-model hardening** for prompt injection, confused deputy, credential exfiltration and cross-agent attacks.
+
+See [ROADMAP.md](ROADMAP.md).
+
 ## Harness integration
 
-Agent Authority is intentionally harness-neutral. It can sit in several places:
+The preferred boundary is outside the model process:
 
-1. **SDK/tool middleware** — evaluate an action before a tool executor runs it.
-2. **Local sidecar** — run beside Codex-like, Claude-Code-like, Cursor-like, IDE, CI, desktop, or custom agents.
-3. **MCP authorization proxy** — place an authority-aware proxy between an MCP client and upstream MCP servers.
-4. **Connector/plugin wrapper** — wrap existing SaaS connectors so permission checks occur before credential use.
-5. **CLI credential helper** — planned ephemeral credential injection for commands such as `git`, cloud CLIs, and deployment tools.
+```text
+LLM / planner
+     |
+agent harness
+     |
+proposed action
+     v
+Agent Authority
+  |      |       |
+ DENY  APPROVE  ALLOW
+                 |
+           provider adapter
+                 |
+              service
+```
+
+Integrations can use:
+
+- HTTP sidecar
+- JavaScript SDK
+- native harness/plugin wrapper
+- MCP proxy
+- CLI credential helper
+- connector-platform adapter
 
 See [Harness Integration](docs/harness-integration.md).
 
-## Legacy + future compatibility
+## Security principles
 
-The internet will remain heterogeneous. The mission model should stay stable while adapters evolve.
+1. Mission before credential.
+2. Agents do not receive long-lived provider secrets.
+3. Deny wins.
+4. Authority may shrink during delegation, never expand.
+5. Resource constraints matter as much as service scopes.
+6. Approval is a policy outcome, not an afterthought.
+7. Revocation and budgets survive daemon restarts.
+8. Receipts are first-class.
+9. Authentication protocols remain replaceable adapters.
+10. Explicit security gaps are documented rather than hidden.
 
-| System type | Adapter strategy |
-|---|---|
-| OAuth/OIDC | token exchange / short-lived access token |
-| MCP | OAuth/MCP-aware adapter or proxy |
-| API key | vault-held key + brokered request/scoped proxy |
-| Cloud IAM | temporary workload/session credential |
-| CLI | temporary process environment / credential helper |
-| Enterprise SSO | organization identity/policy bridge |
-| Browser-only legacy app | isolated authenticated browser/session broker |
-| Future agent-auth protocol | native adapter |
+Do **not** put passwords, refresh tokens, cookies, API keys, customer secrets or production credentials in missions, issues, logs or pull requests. See [SECURITY.md](SECURITY.md).
 
-## MVP scope
+## Contributing
 
-Implemented in the bootstrap:
+We want protocol reviewers, OAuth/OIDC implementers, MCP maintainers, agent framework authors, security engineers, cloud IAM specialists, connector platforms, browser isolation experts, cryptography reviewers and UX contributors.
 
-- mission validation
-- allow / deny policies
-- explicit deny precedence
-- wildcard action scopes
-- mission expiry
-- delegation-depth limits
-- subagent authority attenuation
-- mission revocation / kill switch
-- budget caps
-- human-approval outcomes
-- action receipts
-- adapter registry
-- local HTTP sidecar
-- JavaScript SDK
-- automated tests
-
-Still to build:
-
-- real OAuth token exchange
-- encrypted credential vault
-- passkey/biometric approvals
-- signed mission manifests
-- production MCP proxy
-- browser-session isolation
-- recursive delegated sub-missions
-- enterprise policy sync
-- append-only receipt ledger
-
-We prefer explicit gaps over security theater.
-
-## Architecture principles
-
-1. **Mission before credential.**
-2. **Agents should not receive root secrets.**
-3. **Deny wins.**
-4. **Delegated authority can only shrink.**
-5. **Human approval is a policy outcome.**
-6. **Receipts are first-class.**
-7. **Protocol neutral.**
-8. **Legacy compatibility matters.**
-9. **Local-first testing.**
-10. **Open specification and interoperable implementation.**
-
-## We want contributors
-
-This project is public because the permission model between humans and autonomous agents should be inspectable and interoperable.
-
-We especially welcome:
-
-- OAuth/OIDC implementers
-- MCP maintainers
-- agent framework authors
-- security and identity engineers
-- cloud IAM specialists
-- connector platforms
-- browser automation experts
-- cryptography reviewers
-- policy-engine contributors
-- product/UX contributors working on human approval flows
-
-Early criticism is valuable. Open an issue if you think the abstraction is wrong, overlaps a standard, creates a security problem, or can be made simpler.
-
-## Open research questions
-
-- How should mission semantics map to OAuth authorization details?
-- Which token format best supports attenuating delegation?
-- How should an agent prove its runtime identity?
-- How should browser-only legacy services be brokered safely?
-- What should a portable capability vocabulary look like?
-- How should approval work across terminal, IDE, mobile, and headless agents?
-- Can services advertise agent capabilities through a well-known discovery document?
-
-## Security
-
-Do **not** put passwords, refresh tokens, session cookies, API keys, customer data, or production secrets in mission manifests, examples, issues, logs, or pull requests.
-
-See [SECURITY.md](SECURITY.md).
+If you think the abstraction overlaps an existing standard, creates a security failure or can be made smaller, please open an issue. Early criticism is useful.
 
 ## License
 
@@ -261,6 +279,6 @@ Apache-2.0.
 
 Built in public by **NullSquare** for the agentic internet.
 
-**Keywords:** AI agent authorization · agent authentication · AI agent security · delegated authorization · agent identity · OAuth for AI agents · MCP authorization · Model Context Protocol security · credential broker · coding agent authentication · LLM agent permissions · mission-scoped authorization
+**Keywords:** AI agent authorization · agent authentication · AI agent security · delegated authorization · agent identity · OAuth for AI agents · MCP authorization · Model Context Protocol security · credential broker · coding agent authentication · LLM agent permissions · mission-scoped authorization · agent permission system
 
 </div>

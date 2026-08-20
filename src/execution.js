@@ -26,6 +26,7 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
     super(options);
     this.usage = options.usage || new InMemoryUsageLedger();
     this.approvals = options.approvals || null;
+    this.executions = options.executions || null;
   }
 
   cumulativeBudgetCheck(mission, request) {
@@ -87,12 +88,31 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
   }
 
   async readinessCheck(adapter, missionInput, request) {
+    if (typeof adapter.validateRequest === 'function') adapter.validateRequest(request);
     if (typeof adapter.prepare !== 'function') return null;
     const dispatch = await adapter.prepare({ mission: missionInput, request });
     if (dispatch?.connection_required) {
       return executionFailure(missionInput, request, 'connection_required', `no active ${request.service} connection for this principal`);
     }
     return null;
+  }
+
+  beginMutation(adapter, missionInput, request) {
+    if (!adapter.isMutation?.(request)) return null;
+    if (!this.executions) {
+      return executionFailure(missionInput, request, 'idempotency_store_unavailable', 'mutating action cannot run without an execution guard');
+    }
+    try {
+      return this.executions.begin({ mission: missionInput, request });
+    } catch (error) {
+      return executionFailure(
+        missionInput,
+        request,
+        error.code || 'idempotency_error',
+        error.message,
+        error.execution_record ? { execution: error.execution_record } : {}
+      );
+    }
   }
 
   async execute(missionInput, request) {
@@ -117,11 +137,14 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
       if (error?.code === 'connection_required') {
         return executionFailure(missionInput, request, 'connection_required', error.message);
       }
-      throw error;
+      return executionFailure(missionInput, request, error.code || 'invalid_provider_request', error.message);
     }
 
     evaluation = this.approvalCheck(missionInput, request, evaluation);
     if (evaluation.result.decision !== 'allow') return { ...evaluation, output: null };
+
+    const executionRecord = this.beginMutation(adapter, missionInput, request);
+    if (executionRecord?.result?.decision === 'deny') return executionRecord;
 
     try {
       const output = await adapter.execute({ mission: missionInput, request });
@@ -134,8 +157,14 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
           remaining: Math.max(0, Number(missionInput.constraints.budget.amount) - spent)
         };
       }
-      return { ...evaluation, output, usage };
+      if (executionRecord && this.executions) {
+        this.executions.complete({ mission: missionInput, request, receipt_id: evaluation.receipt?.receipt_id || null });
+      }
+      return { ...evaluation, output, usage, execution: executionRecord || null };
     } catch (error) {
+      if (executionRecord && this.executions) {
+        this.executions.uncertain({ mission: missionInput, request, error_code: error.code || 'provider_error' });
+      }
       if (error?.code === 'connection_required') {
         return executionFailure(missionInput, request, 'connection_required', error.message);
       }

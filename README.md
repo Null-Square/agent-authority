@@ -1,5 +1,7 @@
 <div align="center">
 
+![Agent Authority — mission-scoped authorization for AI agents](docs/assets/agent-authority-cover.svg)
+
 # Agent Authority
 
 ### Mission-scoped authorization for AI agents

@@ -4,159 +4,154 @@
 
 # Agent Authority
 
-### A protocol-neutral permission boundary for AI agents
+### A protocol-neutral authority layer for AI agent actions
 
-**Give an agent a bounded mission. Keep provider credentials outside the model. Enforce the mission before a tool call leaves the harness.**
+**Give an agent a bounded human-approved mission. Enforce it immediately before side effects—through SDKs, MCP, brokered credentials, or harness middleware.**
 
-[Validate in 5 minutes](docs/validation.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Harness integration](docs/harness-integration.md) · [OpenClaw](docs/openclaw-integration.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Validate in 5 minutes](docs/validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Harness integration](docs/harness-integration.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-> **Status: public pre-alpha / executable v0.3 branch.** Mission policy, agent-instance auth, one-time approvals, durable revocation/budgets, credential isolation, idempotency, harness action grants, a GitHub provider boundary, and a read-only MCP policy gateway are implemented. The project is intentionally validating one narrow path before expanding provider coverage.
+> **Status: public pre-alpha / v0.3 validation candidate.** Core mission policy, receipts, local persistence, agent-instance authentication, one-time approvals, mutation idempotency, credential isolation, a protocol-neutral `guard.run()` API, harness action grants, GitHub brokered execution, and an MCP v2 policy gateway are implemented and covered by CI. Production OAuth onboarding, OS keychain backends, remote authenticated deployment, and additional provider adapters remain future work.
 
 </div>
 
-## The problem
+## What problem it solves
 
-Authentication tells a service **who** is calling. Agents also need an enforceable answer to:
+Existing authentication answers questions such as **who is the user?**, **which application has a token?**, and **which provider scopes were granted?** Agent Authority adds a different decision immediately before an agent-originated side effect:
 
-> **What is this agent allowed to accomplish right now, for this human-approved mission?**
+> **Is this specific agent allowed to perform this specific action, on this specific resource, for this human-approved mission, right now?**
 
-Giving every harness a broad provider token does not answer that question.
-
-Agent Authority separates durable account connection from short-lived agent authority:
+The authority decision is independent of how the service was authenticated.
 
 ```text
 Human / organization
         |
-        | mission + approval
+        | mission
         v
-+---------------------------+
-|      Agent Authority      |
-| policy / auth / audit     |
-+-------------+-------------+
++----------------------------+
+|       Agent Authority      |
+| policy / approval / audit  |
++-------------+--------------+
               |
-        allow / deny /
-      require approval
+      ALLOW / DENY / APPROVAL
+              |
+       existing execution path
+              |
+   SDK | MCP | OAuth | CLI | API
               |
               v
-       tool / provider
+         external service
 ```
 
-A mission can restrict service, action, resource, expiry, budget, delegation depth and approval requirements.
+Agent Authority is **not another agent harness**, **not an OAuth replacement**, and **not an MCP product**. MCP is one integration transport around the same authority engine.
 
-## What Agent Authority is not
-
-It is **not** another agent harness, **not** a replacement for OAuth, and **not** an MCP-only product.
-
-MCP is the first high-leverage gateway integration because multiple hosts already speak it. The core authority engine remains independent of transport:
-
-```text
-                  Agent Authority
-                         |
-                 mission decision
-                         |
-          +--------------+--------------+
-          |              |              |
-         MCP          native API      harness bridge
-          |              |              |
-       tools/call      provider        existing connector
-```
-
-If the ecosystem changes transport, the mission semantics do not need to change.
-
-## Validate the core idea in 5 minutes
+## Validate in 5 minutes
 
 Requirements: Node.js 20+.
 
 ```bash
 git clone https://github.com/Null-Square/agent-authority.git
 cd agent-authority
-git checkout hardening/product-runtime-v0.3
 npm install
-npm link
-
-aauth setup --principal user:local
-aauth doctor
+npm test
 ```
 
-Terminal A — run the tiny validation upstream:
+### Fastest protocol-neutral demo
+
+The smallest integration wraps an existing side effect:
+
+```js
+import { AuthorityRuntime } from '@nullsquare/agent-authority';
+import { createAuthorityGuard } from '@nullsquare/agent-authority/guard';
+
+const guard = createAuthorityGuard({ mission, runtime: new AuthorityRuntime() });
+
+const { output, receipt } = await guard.run({
+  service: 'github',
+  action: 'repo.read',
+  context: { repository: 'Null-Square/agent-authority' }
+}, () => github.repos.get({ owner: 'Null-Square', repo: 'agent-authority' }));
+```
+
+If the mission returns `DENY` or `REQUIRE_APPROVAL`, the callback is never invoked.
+
+Run the included public-data demo:
 
 ```bash
+npm run demo:guard
+```
+
+Then prove resource scoping by requesting another repository:
+
+```bash
+npm run demo:guard -- someone/other-repo
+```
+
+The second command is blocked before its GitHub fetch callback executes.
+
+### MCP host demo
+
+The repository also includes a small validation MCP upstream and Agent Authority proxy:
+
+```bash
+agent-authority setup --principal user:local
 npm run demo:mcp-upstream
 ```
 
-Terminal B — put Agent Authority in front of it:
+In another terminal:
 
 ```bash
-aauth mcp proxy \
+agent-authority mcp proxy \
   --upstream http://127.0.0.1:8791/mcp \
-  --mission examples/missions/chatgpt-web-validation.json \
-  --service mcp:validation-upstream
+  --mission examples/missions/web-validation.json \
+  --service mcp:validation
 ```
 
-The upstream advertises:
+The official MCP v2 client integration test verifies that only the mission-authorized read-only tool can reach upstream. See [the complete validation guide](docs/validation.md).
 
-- `github_repo_metadata` — read-only; reads real public GitHub metadata
-- `dangerous_demo_write` — harmless fake write tool used to prove blocking
+## Three integration modes
 
-The mission permits only `github_repo_metadata` and only for `Null-Square/agent-authority`.
+### 1. In-process guard
 
-The gateway must reject an out-of-mission repository and reject the write tool even if a client knows its name. Hiding tools is UX; blocking `tools/call` is the enforcement boundary.
-
-See the complete [validation guide](docs/validation.md).
-
-## MCP host / ChatGPT validation
-
-The gateway binds loopback only in v0.3. Do not expose it unauthenticated to the public internet.
-
-For hosted OpenAI products, OpenAI Secure MCP Tunnel can connect a local/private MCP server without a public inbound endpoint. Point the tunnel at:
+Best when an application already owns its SDK/API connection:
 
 ```text
-http://127.0.0.1:8790/mcp
+agent code -> guard.run() -> existing SDK
 ```
 
-Custom MCP availability varies by product plan and rollout. A UI limitation is not a reason to weaken the gateway security model.
+The host keeps its credential. Agent Authority controls whether the callback may execute.
 
-## Quick local authority setup
+### 2. MCP gateway
 
-```bash
-aauth setup
-aauth doctor
-aauth status
+Best when a host already talks MCP:
+
+```text
+ChatGPT / Claude / Codex / OpenClaw / IDE
+                 |
+                 v
+        Agent Authority MCP
+                 |
+                 v
+          existing MCP server
 ```
 
-Run the local authority daemon:
+### 3. Brokered execution
 
-```bash
-aauth serve
+Best when the agent should not receive or own the provider credential:
+
+```text
+agent -> Agent Authority -> encrypted credential broker -> provider
 ```
 
-Health check:
+All three use the same mission evaluator and receipt model. See [Integration contract](docs/integration-contract.md).
 
-```bash
-curl http://127.0.0.1:8787/health
-```
-
-The daemon binds loopback by default and `/v1/*` operations require short-lived signed agent-instance bearer tokens.
-
-## Connect once
-
-The first native provider is GitHub. The current developer flow reads the token from stdin so it does not appear in shell history:
-
-```bash
-printf %s "$GITHUB_TOKEN" | aauth connect github --token-stdin
-aauth connections
-```
-
-The credential is encrypted in the local Agent Authority vault and is not returned to the model. Browser/device onboarding remains a later UX milestone; it is not required to validate the authority layer.
-
-## Mission example
+## Mission-scoped authority
 
 ```json
 {
   "version": "0.1",
   "mission_id": "mission:fix-agent-authority",
   "principal": { "id": "user:local" },
-  "agent": { "id": "agent:codex:session-42" },
+  "agent": { "id": "agent:codex:session-42", "harness": "codex" },
   "objective": "Fix the approved issue in Agent Authority",
   "resources": [
     {
@@ -170,19 +165,9 @@ The credential is encrypted in the local Agent Authority vault and is not return
   ],
   "constraints": {
     "max_delegation_depth": 1,
-    "expires_at": "2026-08-20T22:00:00Z"
+    "expires_at": "2026-08-21T22:00:00Z"
   }
 }
-```
-
-Evaluate locally:
-
-```bash
-aauth mission validate mission.json
-aauth mission evaluate mission.json \
-  --service github \
-  --action repo.read \
-  --repository Null-Square/agent-authority
 ```
 
 Every sensitive request resolves to:
@@ -193,117 +178,106 @@ DENY
 REQUIRE_APPROVAL
 ```
 
-## Human approval
+The important invariant is simple: **the side effect cannot occur before authority is granted, and the request evaluated must be the request executed.**
 
-Policy can return `REQUIRE_APPROVAL`. Approvals are durable, one-time and bound to the exact mission + request fingerprint:
+## Connect once
 
-```bash
-aauth approvals list --status pending
-aauth approvals approve approval:...
-aauth approvals deny approval:...
-```
-
-A request cannot be modified after approval and reuse of a consumed approval is rejected.
-
-## Agent-instance authentication
-
-The daemon does not trust localhost by itself. Issue short-lived agent credentials:
+The first native brokered provider is GitHub. The current developer onboarding flow reads the token from stdin so it does not appear in shell history:
 
 ```bash
-aauth agent token \
-  --agent agent:codex:session-42 \
-  --mission mission:fix-agent-authority \
-  --ttl 1h
+printf %s "$GITHUB_TOKEN" | agent-authority connect github --token-stdin
+agent-authority connections
 ```
 
-Tokens bind principal, agent, capabilities, expiry and optionally mission ID.
+The credential is encrypted in the local Agent Authority vault and is never returned to the model. Browser/device OAuth remains a future onboarding milestone.
 
-## Two execution modes
+## Local authority home
 
-Agent Authority supports two useful trust models.
-
-### Broker mode
+By default:
 
 ```text
-Agent
-  -> Agent Authority
-       -> encrypted provider connection
-            -> service
+~/.agent-authority/
+  config.json
+  missions/
+  state/
+    connections.json
+    revocations.json
+    usage.json
+    approvals.json
+    idempotency.json
+  vault/
+    master.key
+    agent-auth.key
+    secrets.enc.json
+  receipts/
 ```
 
-Agent Authority performs the authorized provider action without exposing the long-lived credential to the model.
+Override with `AGENT_AUTHORITY_HOME` or `--home`.
 
-### Harness-governance mode
-
-```text
-Agent
-  -> Agent Authority decision / signed action grant
-       -> trusted harness middleware
-            -> harness-owned connector
-```
-
-This is useful when a platform already owns OAuth credentials that cannot and should not be exported to Agent Authority.
+The encrypted-file vault is a local pre-alpha backend; OS keychain/KMS/HSM/enterprise vault backends are future production options.
 
 ## Implemented now
 
-- mission validation and policy evaluation
-- explicit deny precedence and resource/context constraints
-- expiry, cumulative budgets and delegation attenuation
+- mission validation and deterministic policy evaluation
+- explicit deny precedence
+- wildcard action scopes
+- resource/context constraints
+- expiry and cumulative mission budgets
+- delegation depth and child-authority attenuation
 - durable mission revocation
-- receipts
-- short-lived signed agent-instance authentication
-- durable one-time human approvals
-- mutation idempotency ledger
+- action receipts and request hashes
+- agent-instance signed bearer tokens for the local sidecar
+- one-time approvals bound to the exact mission + request
+- mutation idempotency and conservative uncertain-state handling
+- protocol-neutral `guard.run()` enforcement for ordinary SDK/API calls
+- signed harness action grants bound to exact mission + request
+- MCP v2 read-only mission gateway and loopback proxy
 - persistent connection metadata
 - AES-256-GCM local encrypted secret store
-- GitHub authenticated execution without returning credentials to the model
-- signed harness action grants
-- read-only MCP policy gateway using the official MCP v2 SDK
-- MCP `tools/list` and enforced `tools/call` path
-- canonical web-validation mission and real public-GitHub validation upstream
-- JavaScript SDK and CLI
-- adversarial tests, CI and CodeQL
-
-## Current validation target
-
-Before expanding providers, v0.4 should prove one thing well:
-
-```text
-ChatGPT / another MCP host
-        |
-        v
- Agent Authority
-        |
-   SAME MISSION
-        |
-        v
- authorized upstream tool
-```
-
-And the same core mission evaluator should remain usable from non-MCP integrations.
-
-We are deliberately **not** building a dashboard, connector marketplace, custom authentication protocol, enterprise control plane or dozens of provider adapters during this validation phase.
+- GitHub brokered execution without exposing its token to the agent
+- safe reconnect cleanup for replaced provider credentials
+- CLI: setup, doctor, status, connections, serve, connect/disconnect GitHub, mission validate/evaluate, approvals, agent tokens, MCP proxy
+- Node 20/22 CI, coverage, package checks, and CodeQL
 
 ## Security principles
 
 1. Mission before credential.
-2. The model does not receive long-lived provider secrets.
-3. Deny wins.
-4. Authority may shrink during delegation, never expand.
-5. Resource constraints matter as much as service scopes.
-6. Approval is bound to the exact action.
-7. Revocation and budgets survive daemon restarts.
-8. Side-effecting retries require idempotency protection.
-9. Transport protocols remain replaceable adapters.
-10. Security gaps are documented rather than hidden.
+2. No side effect before an authority decision.
+3. The request evaluated must be the request executed.
+4. Deny wins.
+5. Authority may shrink during delegation, never expand.
+6. Resource constraints matter as much as provider scopes.
+7. Human approval is a policy outcome, not an afterthought.
+8. Mutation retries must not silently duplicate side effects.
+9. Revocation and budgets survive daemon restarts.
+10. Authentication protocols and transports remain replaceable adapters.
+11. Long-lived provider secrets must not enter model context through Agent Authority.
+12. Security gaps are documented rather than hidden.
 
-Do **not** put passwords, refresh tokens, cookies, API keys, customer secrets or production credentials in missions, issues, logs or pull requests. See [SECURITY.md](SECURITY.md).
+See [SECURITY.md](SECURITY.md).
+
+## What we are deliberately not building yet
+
+To keep the project useful and small, the current validation phase is **not** trying to become:
+
+- a new agent harness,
+- an OAuth replacement,
+- an MCP replacement,
+- a connector marketplace,
+- an enterprise dashboard,
+- a custom identity protocol.
+
+The project will expand only where real integrations show the authority boundary needs more capability.
 
 ## Contributing
 
-We want security reviewers, agent-harness authors, MCP maintainers, OAuth/OIDC engineers and developers who can make the abstraction smaller or prove where it fails.
+We want agent-framework authors, security engineers, OAuth/OIDC implementers, MCP maintainers, SDK/tool authors, cloud IAM specialists, and developers who can challenge the abstraction.
 
-If you can bypass an authority decision, broaden a mission without permission, replay an approval, duplicate a side effect or leak a credential, that is a valuable bug report.
+The most valuable contributions right now are integrations that prove this invariant in another stack:
+
+> An unauthorized agent-originated side effect cannot reach the provider, while an authorized one can, using the stack's existing authentication and execution machinery.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
@@ -314,5 +288,7 @@ Apache-2.0.
 <div align="center">
 
 Built in public by **NullSquare** for the agentic internet.
+
+**Agent Authority is a protocol-neutral policy enforcement layer for agent actions.**
 
 </div>

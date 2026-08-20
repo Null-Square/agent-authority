@@ -2,16 +2,20 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         node-version: [20, 22]
     steps:
@@ -19,5 +23,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: package.json
       - run: npm test
-      - run: npm run check
+      - run: npm run check:syntax
+      - run: npm run check:package
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run test:coverage

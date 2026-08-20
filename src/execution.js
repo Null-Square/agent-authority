@@ -82,22 +82,22 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
         approval
       };
     } catch (error) {
-      return executionFailure(
-        missionInput,
-        request,
-        error.code || 'approval_invalid',
-        error.message
-      );
+      return executionFailure(missionInput, request, error.code || 'approval_invalid', error.message);
     }
+  }
+
+  async readinessCheck(adapter, missionInput, request) {
+    if (typeof adapter.prepare !== 'function') return null;
+    const dispatch = await adapter.prepare({ mission: missionInput, request });
+    if (dispatch?.connection_required) {
+      return executionFailure(missionInput, request, 'connection_required', `no active ${request.service} connection for this principal`);
+    }
+    return null;
   }
 
   async execute(missionInput, request) {
     let evaluation = this.evaluate(missionInput, request);
-    evaluation = this.approvalCheck(missionInput, request, evaluation);
-    if (evaluation.result.decision !== 'allow') return { ...evaluation, output: null };
-
-    const budgetCheck = this.cumulativeBudgetCheck(missionInput, request);
-    if (budgetCheck?.result?.decision === 'deny') return budgetCheck;
+    if (evaluation.result.decision === 'deny') return { ...evaluation, output: null };
 
     const adapter = this.adapters.resolve(request.service);
     if (!adapter) {
@@ -106,6 +106,22 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
     if (typeof adapter.execute !== 'function') {
       return executionFailure(missionInput, request, 'execution_unavailable', `${adapter.kind || 'selected'} adapter cannot execute actions yet`);
     }
+
+    const budgetCheck = this.cumulativeBudgetCheck(missionInput, request);
+    if (budgetCheck?.result?.decision === 'deny') return budgetCheck;
+
+    try {
+      const readinessFailure = await this.readinessCheck(adapter, missionInput, request);
+      if (readinessFailure) return readinessFailure;
+    } catch (error) {
+      if (error?.code === 'connection_required') {
+        return executionFailure(missionInput, request, 'connection_required', error.message);
+      }
+      throw error;
+    }
+
+    evaluation = this.approvalCheck(missionInput, request, evaluation);
+    if (evaluation.result.decision !== 'allow') return { ...evaluation, output: null };
 
     try {
       const output = await adapter.execute({ mission: missionInput, request });

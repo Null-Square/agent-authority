@@ -1,0 +1,20 @@
+{
+  "version": "0.1",
+  "mission_id": "mission:demo",
+  "principal": { "id": "user:demo" },
+  "agent": { "id": "agent:demo", "harness": "local" },
+  "objective": "Maintain an approved project without destructive or billing actions",
+  "resources": [
+    { "service": "github", "allow": ["repo.read", "repo.write", "pull_request.*"], "deny": ["repo.delete", "billing.*"] },
+    { "service": "google", "allow": ["gmail.read", "gmail.draft", "gmail.send"], "deny": ["gmail.delete"] },
+    { "service": "cloudflare", "allow": ["workers.read", "workers.deploy"], "deny": ["account.delete", "billing.*"] }
+  ],
+  "constraints": {
+    "max_delegation_depth": 2,
+    "budget": { "currency": "USD", "amount": 100 },
+    "expires_at": "2027-01-01T00:00:00Z"
+  },
+  "approvals": [
+    { "match": { "service": "google", "action": "gmail.send" }, "required": true, "reason": "outbound communication requires human approval" }
+  ]
+}

@@ -1,7 +1,10 @@
+import { dirname, join } from 'node:path';
 import { AdapterRegistry, descriptorAdapter } from './index.js';
 import { CredentialBroker } from './connections.js';
 import { ExecutingAuthorityRuntime } from './execution.js';
 import { createGitHubProviderAdapter } from './providers/github.js';
+import { JsonFileApprovalStore } from './approvals.js';
+import { readOrCreateSecretKey } from './keys.js';
 import {
   EncryptedFileSecretStore,
   JsonFileConnectionRegistry,
@@ -17,6 +20,11 @@ export function createRuntimeEnvironment({ home } = {}) {
   const broker = new CredentialBroker({ connections, secrets });
   const revocations = new JsonFileRevocationStore(config.paths.revocations);
   const usage = new JsonFileUsageLedger(config.paths.usage);
+  const stateDir = dirname(config.paths.connections);
+  const vaultDir = dirname(config.paths.master_key);
+  const approvals = new JsonFileApprovalStore(join(stateDir, 'approvals.json'));
+  const agentAuthKeyPath = join(vaultDir, 'agent-auth.key');
+  const agentAuthKey = readOrCreateSecretKey(agentAuthKeyPath);
 
   const adapters = new AdapterRegistry()
     .register(createGitHubProviderAdapter({ broker }))
@@ -25,6 +33,18 @@ export function createRuntimeEnvironment({ home } = {}) {
     .register(descriptorAdapter('api-key', ['cloudflare', 'apollo']))
     .register(descriptorAdapter('cli', ['cli:*']));
 
-  const runtime = new ExecutingAuthorityRuntime({ adapters, revocations, usage });
-  return { config, connections, secrets, broker, revocations, usage, adapters, runtime };
+  const runtime = new ExecutingAuthorityRuntime({ adapters, revocations, usage, approvals });
+  return {
+    config,
+    connections,
+    secrets,
+    broker,
+    revocations,
+    usage,
+    approvals,
+    adapters,
+    runtime,
+    agentAuthKey,
+    agentAuthKeyPath
+  };
 }

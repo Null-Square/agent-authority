@@ -1,0 +1,33 @@
+{
+  "version": "0.1",
+  "mission_id": "mission:chatgpt-web-validation",
+  "principal": {
+    "id": "user:local"
+  },
+  "agent": {
+    "id": "agent:chatgpt-web"
+  },
+  "objective": "Validate that a web agent can read only the approved public Agent Authority repository through an MCP gateway.",
+  "resources": [
+    {
+      "service": "mcp:validation-upstream",
+      "allow": [
+        "tool.github_repo_metadata"
+      ],
+      "deny": [
+        "tool.dangerous_demo_write",
+        "*write*",
+        "*delete*"
+      ],
+      "constraints": {
+        "repository": [
+          "Null-Square/agent-authority"
+        ]
+      }
+    }
+  ],
+  "constraints": {
+    "max_delegation_depth": 0
+  },
+  "approvals": []
+}

@@ -40,6 +40,9 @@ Usage:
   agent-authority config show [--home PATH]
   agent-authority serve [--host HOST] [--port PORT] [--home PATH]
 
+MCP gateway (read-only first milestone):
+  agent-authority mcp proxy --upstream URL --mission FILE [--service mcp:NAME] [--port 8790]
+
 Connections:
   agent-authority connections [--home PATH]
   agent-authority connect github --token-stdin [--account ID] [--no-verify]
@@ -62,6 +65,7 @@ Security:
   Provider credentials are never accepted as command-line values.
   Daemon /v1 APIs require short-lived signed agent-instance bearer tokens.
   Human approvals are one-time and bound to the exact mission + request.
+  MCP proxy binds loopback only and exposes only tools explicitly declared read-only.
 
 Environment:
   AGENT_AUTHORITY_HOME   Override ~/.agent-authority
@@ -264,6 +268,41 @@ async function missionCommand(args) {
   throw new Error('mission command must be `validate` or `evaluate`');
 }
 
+async function mcpCommand(args) {
+  const sub = args.shift();
+  if (sub !== 'proxy') throw new Error('mcp command currently supports `proxy`');
+  const upstreamUrl = flag(args, '--upstream');
+  const missionPath = flag(args, '--mission');
+  if (!upstreamUrl) throw new Error('--upstream URL is required');
+  if (!missionPath) throw new Error('--mission FILE is required');
+
+  const home = homeFrom(args);
+  const env = createRuntimeEnvironment({ home });
+  const mission = assertMission(loadMission(missionPath));
+  if (mission.principal.id !== env.config.principal_id) {
+    throw new Error(`mission principal ${mission.principal.id} does not match local principal ${env.config.principal_id}`);
+  }
+
+  const host = flag(args, '--host', '127.0.0.1');
+  const port = Number(flag(args, '--port', '8790'));
+  const service = flag(args, '--service', 'mcp:upstream');
+  const { startMcpProxyServer } = await import('./mcp-server.js');
+  const instance = await startMcpProxyServer({
+    mission,
+    runtime: env.runtime,
+    upstreamUrl,
+    service,
+    host,
+    port
+  });
+  console.log(`✓ Agent Authority MCP gateway listening on http://${instance.host}:${instance.port}/mcp`);
+  console.log(`Mission: ${mission.mission_id}`);
+  console.log(`Service: ${service}`);
+  console.log(`Upstream: ${upstreamUrl}`);
+  console.log('Mode: read-only (write tools are not advertised or callable)');
+  return instance;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const command = args.shift();
@@ -277,6 +316,7 @@ async function main() {
   if (command === 'agent') return agentCommand(args);
   if (command === 'approvals') return approvalsCommand(args);
   if (command === 'mission') return missionCommand(args);
+  if (command === 'mcp') return mcpCommand(args);
   if (command === 'connect') {
     if (args.shift() !== 'github') throw new Error('only the GitHub native connection is implemented today');
     return connectGitHub(args);

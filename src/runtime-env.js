@@ -4,6 +4,7 @@ import { CredentialBroker } from './connections.js';
 import { ExecutingAuthorityRuntime } from './execution.js';
 import { createGitHubProviderAdapter } from './providers/github.js';
 import { JsonFileApprovalStore } from './approvals.js';
+import { JsonFileExecutionGuard } from './idempotency.js';
 import { readOrCreateSecretKey } from './keys.js';
 import {
   EncryptedFileSecretStore,
@@ -23,6 +24,7 @@ export function createRuntimeEnvironment({ home } = {}) {
   const stateDir = dirname(config.paths.connections);
   const vaultDir = dirname(config.paths.master_key);
   const approvals = new JsonFileApprovalStore(join(stateDir, 'approvals.json'));
+  const executions = new JsonFileExecutionGuard(join(stateDir, 'executions.json'));
   const agentAuthKeyPath = join(vaultDir, 'agent-auth.key');
   const agentAuthKey = readOrCreateSecretKey(agentAuthKeyPath);
 
@@ -33,7 +35,7 @@ export function createRuntimeEnvironment({ home } = {}) {
     .register(descriptorAdapter('api-key', ['cloudflare', 'apollo']))
     .register(descriptorAdapter('cli', ['cli:*']));
 
-  const runtime = new ExecutingAuthorityRuntime({ adapters, revocations, usage, approvals });
+  const runtime = new ExecutingAuthorityRuntime({ adapters, revocations, usage, approvals, executions });
   return {
     config,
     connections,
@@ -42,6 +44,7 @@ export function createRuntimeEnvironment({ home } = {}) {
     revocations,
     usage,
     approvals,
+    executions,
     adapters,
     runtime,
     agentAuthKey,

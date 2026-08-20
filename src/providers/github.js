@@ -83,11 +83,28 @@ function buildOperation(request) {
   }
 }
 
-function sanitizeBody(body) {
-  if (!body || typeof body !== 'object') return body;
-  const clone = structuredClone(body);
-  for (const key of ['token', 'access_token', 'refresh_token', 'authorization']) {
-    if (key in clone) clone[key] = '[redacted]';
+const SECRET_KEYS = new Set([
+  'token',
+  'access_token',
+  'refresh_token',
+  'authorization',
+  'client_secret',
+  'password',
+  'secret'
+]);
+
+function sanitizeBody(value, seen = new WeakSet()) {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map((item) => sanitizeBody(item, seen));
+  if (typeof value !== 'object') return value;
+  if (seen.has(value)) return '[circular]';
+  seen.add(value);
+
+  const clone = {};
+  for (const [key, child] of Object.entries(value)) {
+    clone[key] = SECRET_KEYS.has(String(key).toLowerCase())
+      ? '[redacted]'
+      : sanitizeBody(child, seen);
   }
   return clone;
 }

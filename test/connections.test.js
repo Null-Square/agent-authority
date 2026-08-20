@@ -130,6 +130,80 @@ test('authorized GitHub execution uses credential internally and returns sanitiz
   assert.equal(JSON.stringify(output).includes('super-secret-token'), false);
 });
 
+test('provider output recursively redacts nested secrets', async () => {
+  const broker = new CredentialBroker();
+  broker.connect({
+    principal_id: 'user:test', service: 'github', auth_kind: 'oauth', credential: 'broker-token'
+  });
+  const adapter = createGitHubProviderAdapter({
+    broker,
+    fetchImpl: async () => new Response(JSON.stringify({
+      ok: true,
+      nested: { access_token: 'leaked-token', deeper: [{ refresh_token: 'leaked-refresh' }] },
+      authorization: 'Bearer leaked'
+    }), { status: 200 })
+  });
+  const runtime = new ExecutingAuthorityRuntime({ adapters: new AdapterRegistry().register(adapter) });
+
+  const output = await runtime.execute(mission(), {
+    service: 'github', action: 'repo.read', context: { repository: 'Null-Square/agent-authority' }
+  });
+
+  assert.equal(output.output.body.nested.access_token, '[redacted]');
+  assert.equal(output.output.body.nested.deeper[0].refresh_token, '[redacted]');
+  assert.equal(output.output.body.authorization, '[redacted]');
+  assert.equal(JSON.stringify(output).includes('leaked-token'), false);
+});
+
+test('reconnecting same account rotates credential and destroys stale secret', () => {
+  const broker = new CredentialBroker();
+  const first = broker.connect({
+    principal_id: 'user:test', service: 'github', auth_kind: 'oauth', credential: 'old-token'
+  });
+  const second = broker.connect({
+    principal_id: 'user:test', service: 'github', auth_kind: 'oauth', credential: 'new-token'
+  });
+
+  assert.equal(first.connection_id, second.connection_id);
+  assert.notEqual(first.credential_ref, second.credential_ref);
+  assert.equal(broker.resolveInternal({ principal_id: 'user:test', service: 'github' }).credential, 'new-token');
+  assert.throws(() => broker.secrets.get(first.credential_ref), /unavailable/);
+});
+
+test('disconnect makes connection unusable and hides vault reference', () => {
+  const broker = new CredentialBroker();
+  broker.connect({
+    principal_id: 'user:test', service: 'github', auth_kind: 'oauth', credential: 'token'
+  });
+
+  const disconnected = broker.disconnect({ principal_id: 'user:test', service: 'github' });
+  assert.equal(disconnected.status, 'revoked');
+  assert.equal(disconnected.credential_ref, undefined);
+  assert.throws(
+    () => broker.resolveInternal({ principal_id: 'user:test', service: 'github' }),
+    (error) => error.code === 'connection_required'
+  );
+});
+
+test('multi-account selection resolves only the requested account credential', () => {
+  const broker = new CredentialBroker();
+  broker.connect({
+    principal_id: 'user:test', service: 'github', account_id: 'work', auth_kind: 'oauth', credential: 'work-token'
+  });
+  broker.connect({
+    principal_id: 'user:test', service: 'github', account_id: 'personal', auth_kind: 'oauth', credential: 'personal-token'
+  });
+
+  assert.equal(
+    broker.resolveInternal({ principal_id: 'user:test', service: 'github', account_id: 'work' }).credential,
+    'work-token'
+  );
+  assert.equal(
+    broker.resolveInternal({ principal_id: 'user:test', service: 'github', account_id: 'personal' }).credential,
+    'personal-token'
+  );
+});
+
 test('delegated child cannot drop repository constraints', async () => {
   const { deriveMission } = await import('../src/index.js');
   const parent = mission({ constraints: { max_delegation_depth: 1 } });

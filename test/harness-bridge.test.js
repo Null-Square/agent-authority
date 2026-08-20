@@ -47,7 +47,9 @@ test('harness grant rejects mission substitution', () => {
 
 test('harness grant rejects tampering', () => {
   const issued = issueHarnessActionGrant({ key, mission, request, ttl_seconds: 30, now: 1_000_000 });
-  const tampered = `${issued.token.slice(0, -1)}${issued.token.endsWith('A') ? 'B' : 'A'}`;
+  const [body, signature] = issued.token.split('.');
+  const tamperedSignature = `${signature.startsWith('A') ? 'B' : 'A'}${signature.slice(1)}`;
+  const tampered = `${body}.${tamperedSignature}`;
   assert.throws(() => verifyHarnessActionGrant(tampered, { key, mission, request, now: 1_005_000 }), (error) => error.code === 'grant_signature_invalid');
 });
 

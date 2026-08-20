@@ -1,0 +1,21 @@
+{
+  "name": "@nullsquare/agent-authority",
+  "version": "0.1.0",
+  "description": "Mission-scoped authorization and delegated authority runtime for AI agents.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": false,
+  "keywords": ["ai-agent-authorization","agent-auth","agent-security","delegated-authorization","oauth","mcp","model-context-protocol","credential-broker","coding-agents","llm-agents"],
+  "scripts": {
+    "start": "node src/server.js",
+    "demo": "node examples/demo.js",
+    "test": "node --test test/*.test.js",
+    "check": "node --check src/index.js && node --check src/server.js && npm test"
+  },
+  "engines": { "node": ">=20" },
+  "main": "src/index.js",
+  "exports": "./src/index.js",
+  "repository": { "type": "git", "url": "git+https://github.com/Null-Square/agent-authority.git" },
+  "bugs": { "url": "https://github.com/Null-Square/agent-authority/issues" },
+  "homepage": "https://github.com/Null-Square/agent-authority#readme"
+}

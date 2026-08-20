@@ -15,8 +15,10 @@ export class AccountConnectionRegistry {
     if (!auth_kind) throw new Error('auth_kind is required');
     if (!credential_ref) throw new Error('credential_ref is required');
 
+    const previous = this.connections.get(key(principal_id, service, account_id));
+    const now = new Date().toISOString();
     const connection = {
-      connection_id: `connection:${randomUUID()}`,
+      connection_id: previous?.connection_id || `connection:${randomUUID()}`,
       principal_id,
       service,
       account_id,
@@ -25,8 +27,8 @@ export class AccountConnectionRegistry {
       scopes: [...new Set(scopes)],
       metadata,
       status: 'active',
-      connected_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      connected_at: previous?.connected_at || now,
+      updated_at: now
     };
 
     this.connections.set(key(principal_id, service, account_id), connection);
@@ -90,16 +92,30 @@ export class CredentialBroker {
 
   connect({ principal_id, service, account_id = 'default', auth_kind, credential, scopes = [], metadata = {} }) {
     if (credential === undefined || credential === null) throw new Error('credential is required');
+
+    const current = this.connections.get({ principal_id, service, account_id });
     const credential_ref = this.secrets.put(credential);
-    return this.connections.connect({
-      principal_id,
-      service,
-      account_id,
-      auth_kind,
-      credential_ref,
-      scopes,
-      metadata
-    });
+
+    try {
+      const connection = this.connections.connect({
+        principal_id,
+        service,
+        account_id,
+        auth_kind,
+        credential_ref,
+        scopes,
+        metadata
+      });
+
+      if (current?.credential_ref && current.credential_ref !== credential_ref) {
+        this.secrets.delete(current.credential_ref);
+      }
+
+      return connection;
+    } catch (error) {
+      this.secrets.delete(credential_ref);
+      throw error;
+    }
   }
 
   getConnection({ principal_id, service, account_id = 'default' }) {

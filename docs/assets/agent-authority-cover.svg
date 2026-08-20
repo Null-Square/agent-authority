@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="640" viewBox="0 0 1600 640" role="img" aria-label="Agent Authority — mission scoped authorization for AI agents">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/><stop offset="1" stop-color="#121a36"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#4ecbff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="640" rx="36" fill="url(#bg)"/>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#fff">
+    <text x="100" y="120" font-size="28" font-weight="700" letter-spacing="3">NULLSQUARE / OPEN SOURCE</text>
+    <text x="100" y="220" font-size="78" font-weight="800">Agent Authority</text>
+    <text x="100" y="285" font-size="34" fill="#b9c7e6">Mission-scoped authorization for AI agents</text>
+    <text x="100" y="355" font-size="27" fill="#8fe1ff">One mission · Any agent · Any auth system</text>
+  </g>
+  <g transform="translate(930 95)" font-family="Arial, Helvetica, sans-serif">
+    <rect x="120" y="0" width="330" height="72" rx="16" fill="#111c34" stroke="#6d85ff"/>
+    <text x="285" y="44" text-anchor="middle" font-size="24" fill="#fff">Human-approved mission</text>
+    <path d="M285 72 V120" stroke="#7786a8" stroke-width="3"/>
+    <rect x="80" y="120" width="410" height="90" rx="18" fill="#171842" stroke="#8b67ff" stroke-width="2"/>
+    <text x="285" y="158" text-anchor="middle" font-size="25" font-weight="700" fill="#fff">AUTHORITY RUNTIME</text>
+    <text x="285" y="190" text-anchor="middle" font-size="20" fill="#b9c7e6">allow · deny · approve · revoke</text>
+    <path d="M285 210 V260" stroke="#7786a8" stroke-width="3"/>
+    <rect x="80" y="260" width="410" height="72" rx="16" fill="#101b30" stroke="#4ecbff"/>
+    <text x="285" y="304" text-anchor="middle" font-size="23" fill="#fff">Adapters / connectors</text>
+    <path d="M285 332 V382" stroke="#7786a8" stroke-width="3"/>
+    <g fill="#101b30" stroke="#4b628c">
+      <rect x="0" y="382" width="135" height="64" rx="14"/><rect x="145" y="382" width="135" height="64" rx="14"/>
+      <rect x="290" y="382" width="135" height="64" rx="14"/><rect x="435" y="382" width="135" height="64" rx="14"/>
+    </g>
+    <g font-size="20" fill="#fff" text-anchor="middle">
+      <text x="67" y="422">OAuth</text><text x="212" y="422">MCP</text><text x="357" y="422">API / CLI</text><text x="502" y="422">Legacy</text>
+    </g>
+  </g>
+  <rect x="100" y="430" width="690" height="2" fill="url(#accent)"/>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#b9c7e6">
+    <text x="100" y="485">Delegation attenuation</text><text x="330" y="485">Human approvals</text><text x="555" y="485">Action receipts</text>
+    <text x="100" y="530">Credential isolation</text><text x="330" y="530">Legacy compatibility</text><text x="555" y="530">Protocol neutral</text>
+  </g>
+</svg>

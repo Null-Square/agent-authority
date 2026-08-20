@@ -1,7 +1,7 @@
 {
   "name": "@nullsquare/agent-authority",
-  "version": "0.1.0",
-  "description": "Mission-scoped authorization and delegated authority runtime for AI agents.",
+  "version": "0.2.0",
+  "description": "Mission-scoped authorization, credential isolation and delegated authority runtime for AI agents.",
   "license": "Apache-2.0",
   "type": "module",
   "private": false,
@@ -17,11 +17,17 @@
     "coding-agents",
     "llm-agents"
   ],
+  "bin": {
+    "agent-authority": "src/cli.js",
+    "aauth": "src/cli.js"
+  },
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node src/cli.js serve",
+    "setup": "node src/cli.js setup",
+    "doctor": "node src/cli.js doctor",
     "demo": "node examples/demo.js",
     "test": "node --test test/*.test.js",
-    "check": "node --check src/index.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/sdk.js && node --check src/server.js && npm test"
+    "check": "node --check src/index.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/storage.js && node --check src/runtime-env.js && node --check src/sdk.js && node --check src/server.js && node --check src/cli.js && npm test"
   },
   "engines": { "node": ">=20" },
   "main": "src/index.js",
@@ -30,8 +36,10 @@
     "./connections": "./src/connections.js",
     "./execution": "./src/execution.js",
     "./sdk": "./src/sdk.js",
+    "./storage": "./src/storage.js",
     "./providers/github": "./src/providers/github.js"
   },
+  "files": ["src", "docs", "examples", "README.md", "LICENSE", "SECURITY.md"],
   "repository": { "type": "git", "url": "git+https://github.com/Null-Square/agent-authority.git" },
   "bugs": { "url": "https://github.com/Null-Square/agent-authority/issues" },
   "homepage": "https://github.com/Null-Square/agent-authority#readme"

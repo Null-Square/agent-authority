@@ -137,8 +137,10 @@ export class JsonFileApprovalStore {
     if (!record) throw approvalError('approval_not_found', 'approval request does not exist');
     if (Date.parse(record.expires_at) <= Number(now)) throw approvalError('approval_expired', 'approval request has expired');
     if (record.status === 'denied') throw approvalError('approval_denied', 'human denied this action');
+    if (record.status === 'consumed' || record.consumed_at) {
+      throw approvalError('approval_replayed', 'approval has already been consumed');
+    }
     if (record.status !== 'approved') throw approvalError('approval_pending', 'approval has not been granted yet');
-    if (record.consumed_at) throw approvalError('approval_replayed', 'approval has already been consumed');
     if (record.principal_id !== mission.principal.id || record.agent_id !== mission.agent.id || record.mission_id !== mission.mission_id) {
       throw approvalError('approval_binding_mismatch', 'approval is bound to a different principal, agent, or mission');
     }

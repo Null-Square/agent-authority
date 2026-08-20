@@ -1,17 +1,18 @@
 import http from 'node:http';
 import { AdapterRegistry, descriptorAdapter } from './index.js';
-import { CredentialBroker } from './connections.js';
 import { ExecutingAuthorityRuntime } from './execution.js';
 import { createGitHubProviderAdapter } from './providers/github.js';
+import { createLocalCredentialBroker, defaultAgentAuthorityDirectory } from './storage/local.js';
 
 const host = process.env.AGENT_AUTHORITY_HOST || '127.0.0.1';
 const port = Number(process.env.AGENT_AUTHORITY_PORT || 8787);
 
-const broker = new CredentialBroker();
+const broker = createLocalCredentialBroker();
 
 // Development bridge only: lets a developer prove the no-secret-in-model
-// execution path before the browser OAuth connection flow lands. Production
-// deployments should use a durable encrypted vault and provider OAuth flow.
+// execution path before the browser OAuth connection flow lands. If supplied,
+// the token is encrypted into the local vault and then resolved only behind the
+// execution boundary. Browser OAuth should replace this setup path for users.
 if (process.env.AGENT_AUTHORITY_GITHUB_TOKEN) {
   broker.connect({
     principal_id: process.env.AGENT_AUTHORITY_PRINCIPAL_ID || 'user:local',
@@ -56,7 +57,13 @@ const server = http.createServer(async (req, res) => {
     const url = urlFor(req);
 
     if (req.method === 'GET' && url.pathname === '/health') {
-      return send(res, 200, { ok: true, service: 'agent-authority', version: '0.1.0' });
+      return send(res, 200, {
+        ok: true,
+        service: 'agent-authority',
+        version: '0.1.0',
+        storage: 'encrypted-local',
+        home: defaultAgentAuthorityDirectory()
+      });
     }
 
     if (req.method === 'GET' && url.pathname === '/v1/connections') {

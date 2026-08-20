@@ -31,7 +31,7 @@
     "demo": "node examples/demo.js",
     "test": "node --test test/*.test.js",
     "test:coverage": "node --experimental-test-coverage --test test/*.test.js",
-    "check:syntax": "node --check src/index.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/storage.js && node --check src/runtime-env.js && node --check src/sdk.js && node --check src/server.js && node --check src/cli.js && node --check src/agent-auth.js && node --check src/approvals.js && node --check src/idempotency.js && node --check src/keys.js",
+    "check:syntax": "node --check src/index.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/storage.js && node --check src/runtime-env.js && node --check src/sdk.js && node --check src/server.js && node --check src/cli.js && node --check src/agent-auth.js && node --check src/approvals.js && node --check src/idempotency.js && node --check src/keys.js && node --check src/harness-bridge.js",
     "check:package": "npm pack --dry-run",
     "check": "npm run check:syntax && npm test && npm run check:package"
   },
@@ -43,6 +43,7 @@
     "./approvals": "./src/approvals.js",
     "./connections": "./src/connections.js",
     "./execution": "./src/execution.js",
+    "./harness-bridge": "./src/harness-bridge.js",
     "./idempotency": "./src/idempotency.js",
     "./sdk": "./src/sdk.js",
     "./storage": "./src/storage.js",

@@ -21,7 +21,7 @@
     "start": "node src/server.js",
     "demo": "node examples/demo.js",
     "test": "node --test test/*.test.js",
-    "check": "node --check src/index.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/sdk.js && node --check src/server.js && npm test"
+    "check": "node --check src/index.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/providers/github-device-auth.js && node --check src/storage/local.js && node --check src/sdk.js && node --check src/server.js && npm test"
   },
   "engines": { "node": ">=20" },
   "main": "src/index.js",
@@ -30,7 +30,9 @@
     "./connections": "./src/connections.js",
     "./execution": "./src/execution.js",
     "./sdk": "./src/sdk.js",
-    "./providers/github": "./src/providers/github.js"
+    "./providers/github": "./src/providers/github.js",
+    "./providers/github-device-auth": "./src/providers/github-device-auth.js",
+    "./storage/local": "./src/storage/local.js"
   },
   "repository": { "type": "git", "url": "git+https://github.com/Null-Square/agent-authority.git" },
   "bugs": { "url": "https://github.com/Null-Square/agent-authority/issues" },

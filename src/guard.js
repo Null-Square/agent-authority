@@ -12,7 +12,7 @@ export class AuthorityApprovalRequiredError extends Error {
   constructor({ result, receipt }) {
     super(result?.reason || 'human approval required by Agent Authority');
     this.name = 'AuthorityApprovalRequiredError';
-    this.code = 'approval_required';
+    this.code = result?.code || 'approval_required';
     this.result = result;
     this.receipt = receipt;
   }
@@ -22,21 +22,28 @@ export class AuthorityApprovalRequiredError extends Error {
  * Minimal protocol-neutral enforcement wrapper.
  *
  * Put the side effect inside run(). The callback is invoked only after the
- * mission evaluates to ALLOW. DENY and REQUIRE_APPROVAL never execute it.
- * Credentials remain owned by the host application/provider SDK.
+ * authority boundary returns ALLOW. A guard can use either a static mission or
+ * a TaskLease. Task leases add provenance-bound restrictions without changing
+ * the host application's credential ownership.
  */
 export class AuthorityGuard {
-  constructor({ mission, runtime, onDecision } = {}) {
-    if (!mission) throw new Error('mission is required');
+  constructor({ mission, lease, runtime, onDecision } = {}) {
+    if ((mission && lease) || (!mission && !lease)) {
+      throw new Error('provide exactly one of mission or lease');
+    }
+    if (lease && typeof lease.evaluate !== 'function') throw new Error('lease must implement evaluate(runtime, request)');
     if (!runtime || typeof runtime.evaluate !== 'function') throw new Error('authority runtime is required');
     if (onDecision !== undefined && typeof onDecision !== 'function') throw new Error('onDecision must be a function');
-    this.mission = mission;
+    this.mission = mission || null;
+    this.lease = lease || null;
     this.runtime = runtime;
     this.onDecision = onDecision || null;
   }
 
   evaluate(request) {
-    const evaluation = this.runtime.evaluate(this.mission, request);
+    const evaluation = this.lease
+      ? this.lease.evaluate(this.runtime, request)
+      : this.runtime.evaluate(this.mission, request);
     if (this.onDecision) this.onDecision(evaluation, request);
     return evaluation;
   }
@@ -65,4 +72,8 @@ export class AuthorityGuard {
 
 export function createAuthorityGuard(options) {
   return new AuthorityGuard(options);
+}
+
+export function createTaskLeaseGuard({ lease, ...options } = {}) {
+  return new AuthorityGuard({ ...options, lease });
 }

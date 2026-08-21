@@ -1,58 +1,243 @@
-# Validate Agent Authority in 5 minutes
+# Validate Agent Authority
 
-The goal of this validation is deliberately narrow:
+The v0.5 validation target is deliberately practical:
 
-> A real MCP host should only be able to call the tool + resource allowed by a human mission, while the upstream provider/tool remains unaware of Agent Authority.
+> **A developer should be able to keep an existing agent framework, tools, SDKs, and credentials while Agent Authority prevents a protected tool from executing outside the human-approved task.**
 
-This is a product-layer test, not a benchmark and not a claim of production readiness.
+This is a product-layer validation, not a claim of production readiness.
 
-## What this proves
+## The primary proof: protect existing tools
 
-The repository includes:
-
-- an Agent Authority MCP gateway (`aauth mcp proxy`)
-- a tiny validation upstream with one real read-only GitHub metadata tool
-- one fake write-capable tool that must never pass the gateway in read-only mode
-- a canonical mission restricted to `Null-Square/agent-authority`
-- wire-level tests using the official MCP v2 client SDK
-
-The path is:
+Agent Authority now wraps ordinary tool objects at their `execute()` boundary.
 
 ```text
-MCP host
-  -> Agent Authority
-       -> mission policy
-            -> allowed read-only tool
-                 -> validation MCP upstream
-                      -> public GitHub API
+model / agent framework
+        |
+        v
+   protected tool
+        |
+        v
+   Agent Authority
+      Task Lease
+        |
+   ALLOW / DENY / STEP-UP
+        |
+        v
+ original tool.execute()
+        |
+        v
+ provider / SDK / API
 ```
 
-## 1. Install and initialize
+If the decision is `DENY` or `REQUIRE_APPROVAL`, the original `execute()` callback is never invoked.
+
+The framework does not need to understand Agent Authority.
+
+## 1. Install and run the core checks
+
+Requirements: Node.js 20+.
 
 ```bash
 npm install
-npm link
-
-aauth setup --principal user:local
-aauth doctor
+npm test
+npm run demo:task-lease
 ```
 
-## 2. Run the tiny validation upstream
+The Task Lease demo proves:
 
-Terminal A:
+1. one authorized read succeeds;
+2. a concrete resource is derived from that authorized execution;
+3. a later side effect may use exactly that derived resource;
+4. a different concrete resource becomes `authority_delta_required`;
+5. completing the task removes the task authority.
+
+## 2. Validate inside a real agent framework
+
+Run:
+
+```bash
+npm run demo:vercel-ai
+```
+
+This uses the real Vercel AI SDK `ToolLoopAgent`, `tool()`, and `MockLanguageModelV3` APIs.
+
+The important property is that the **model chooses the tool calls**. The demo is not a hand-written sequence pretending to be an agent.
+
+### Authorized flow
+
+```text
+ToolLoopAgent
+   |
+   | model selects
+   v
+readThread(thread:91)
+   |
+   v
+Agent Authority -> ALLOW
+   |
+   v
+provider effect executes once
+   |
+   v
+output.sender = customer@example.com
+   |
+   v
+derived task authority
+   |
+   | model selects
+   v
+createMeeting(customer@example.com)
+   |
+   v
+Agent Authority -> ALLOW
+   |
+   v
+calendar effect executes once
+```
+
+### Adversarial flow
+
+The mock model deliberately selects:
+
+```text
+createMeeting(attacker@example.com)
+```
+
+Expected result:
+
+```text
+Agent Authority -> authority_delta_required
+calendar provider effects -> 0
+```
+
+The model can choose the wrong effect. The provider still must not receive it.
+
+This exact demonstration is a dedicated GitHub Actions job named `framework-validation`.
+
+## 3. Validate against a real external provider
+
+Run:
+
+```bash
+npm run demo:live-github
+```
+
+The script uses the real public GitHub REST API.
+
+Its Task Lease permits exactly:
+
+```text
+Null-Square/agent-authority
+```
+
+The first request is allowed and reaches `api.github.com`.
+
+The script then tries:
+
+```text
+octocat/Hello-World
+```
+
+That second resource is outside the Task Lease. Agent Authority returns an authority delta before `fetch()` executes.
+
+The pass condition is exactly one outbound GitHub call.
+
+The CI version of this proof has recorded:
+
+```text
+ALLOW -> live GitHub returned Null-Square/agent-authority
+Outbound GitHub calls: 1
+STEP-UP -> octocat/Hello-World is outside task authority
+PASS -> unrelated repository was blocked before fetch()
+```
+
+No GitHub credential is required. If `GITHUB_TOKEN` is supplied locally, the demo uses it without printing it.
+
+## 4. Network-boundary test
+
+The automated suite also includes a local HTTP provider with deliberately broad credentials.
+
+The provider counts actual network requests rather than trusting an in-process callback counter.
+
+The test verifies:
+
+```text
+allowed task resource
+    -> authenticated HTTP request reaches provider
+
+unrelated resource
+    -> Agent Authority blocks
+    -> zero additional provider requests
+
+task completed
+    -> previously allowed resource blocked
+    -> zero additional provider requests
+```
+
+This demonstrates the distinction between **standing provider connectivity** and **temporary task authority**.
+
+## 5. Fail-closed tool mapping
+
+`protectTools()` expects every protected tool to have an authority mapping.
+
+```js
+const tools = protectTools(existingTools, {
+  lease,
+  runtime,
+  mappings: {
+    readThread: {
+      service: 'gmail',
+      action: 'thread.read',
+      context: ({ input }) => ({ thread: input.threadId })
+    },
+    createMeeting: {
+      service: 'calendar',
+      action: 'event.create',
+      context: ({ input }) => ({ attendee: input.attendee })
+    }
+  }
+});
+```
+
+If `existingTools` contains another tool with no mapping, setup fails instead of silently exposing an unprotected execution path.
+
+`allowUnmapped: true` exists only for tools intentionally outside the authority boundary, such as pure local calculations. Using it broadens the trusted application boundary and should be explicit.
+
+## 6. Derived-authority replay behavior
+
+Agents often repeat reads. Repeating the same trusted derivation should not break a normal tool loop.
+
+v0.5 therefore treats an identical derived fact as idempotent:
+
+```text
+fact:sender = customer@example.com
+        +
+same derivation again
+        -> no-op
+```
+
+But a later attempt to change that established fact is rejected:
+
+```text
+fact:sender = customer@example.com
+        +
+new value = attacker@example.com
+        -> derived_fact_conflict
+```
+
+The existing task authority remains unchanged.
+
+## 7. MCP interoperability remains secondary
+
+Agent Authority still includes an MCP v2 gateway and wire-level MCP tests. MCP is one transport around the same authority runtime, not the product identity.
+
+For the MCP validation path:
 
 ```bash
 npm run demo:mcp-upstream
 ```
 
-It listens on `http://127.0.0.1:8791/mcp` and advertises two tools:
-
-- `github_repo_metadata` — explicitly read-only; reads public GitHub repository metadata
-- `dangerous_demo_write` — harmless fake mutation used only to prove the gateway blocks write-capable tools
-
-## 3. Put Agent Authority in front of it
-
-Terminal B:
+Then, in another terminal:
 
 ```bash
 aauth mcp proxy \
@@ -61,64 +246,63 @@ aauth mcp proxy \
   --service mcp:validation-upstream
 ```
 
-The gateway listens on `http://127.0.0.1:8790/mcp`.
+The gateway must allow the mission-authorized read and reject unrelated resources or write-capable tools before they reach upstream.
 
-It intentionally binds loopback only and refuses a public bind in this release.
+## Automated validation matrix
 
-## Expected behavior
+PR validation currently includes:
 
-A client connected to the Agent Authority gateway should:
+- Node 20 tests;
+- Node 22 tests;
+- coverage;
+- syntax checks;
+- npm package dry-run;
+- Task Lease demo;
+- Vercel AI SDK `framework-validation`;
+- live GitHub API validation;
+- CodeQL.
 
-1. see `github_repo_metadata`
-2. not see the fake write-capable tool in read-only mode
-3. succeed for:
+## What these proofs establish
 
-```json
-{
-  "name": "github_repo_metadata",
-  "arguments": {
-    "repository": "Null-Square/agent-authority"
-  }
-}
-```
+They support these claims:
 
-4. be denied if it changes the repository to another value
-5. be denied if it tries to call the write-capable tool directly even if it knows the upstream tool name
+1. Agent Authority can sit around existing tool execution without replacing the framework.
+2. The framework/model can choose the tool call; authorization still happens immediately before the effect.
+3. Protected unauthorized effects do not invoke the provider callback.
+4. A protected request for an unrelated resource does not silently inherit authority.
+5. Authority discovered during an authorized task can constrain a later tool call.
+6. Repeated identical derivation is safe and idempotent; conflicting derivation is rejected.
+7. The same repository still supports non-framework and MCP enforcement paths.
 
-The key property is #5: hiding a tool is UX; enforcing `tools/call` is the security boundary.
+## What these proofs do **not** establish
 
-## Automated proof
+They do not prove that Agent Authority can intercept arbitrary alternate execution paths.
 
-Run:
+If the same agent also receives any of the following outside the protected boundary:
 
-```bash
-npm test
-```
+- a raw provider credential;
+- an unwrapped provider client;
+- unrestricted shell access;
+- unrestricted browser automation;
+- another unprotected tool to the same service;
 
-The MCP tests cover the gateway policy directly and use the official MCP v2 client against the actual Agent Authority handler. No external provider credentials are required.
+then it may bypass `protectTools()` entirely.
 
-## ChatGPT / hosted OpenAI validation
+Agent Authority protects the execution paths placed behind it. Stronger isolation requires brokered credentials, sandboxing, or host-level integration.
 
-ChatGPT cannot connect directly to a localhost MCP server. OpenAI supports Secure MCP Tunnel for connecting local/private MCP servers to supported OpenAI products without exposing the server publicly.
+The v0.5 derived-value extractor is also still trusted application code. Agent Authority records the source receipt, selector, parent facts, and lineage, but does not yet cryptographically prove that the mapped value came from the provider response.
 
-Use the official `openai/tunnel-client` quickstart (`tunnel-client help quickstart`) and point the tunnel at:
+## Current pass/fail criterion
 
-```text
-http://127.0.0.1:8790/mcp
-```
+v0.5 passes only if all of these are true:
 
-Then configure the resulting tunnel-backed MCP endpoint/app in the supported OpenAI product.
+- a normal existing tool can be wrapped without changing its public schema/description;
+- allowed tool effects execute exactly once;
+- denied or step-up effects execute zero times;
+- unmapped tools fail closed by default;
+- a real `ToolLoopAgent` can complete the intended multi-tool task;
+- the same framework can choose an unrelated effect and Agent Authority blocks it before provider execution;
+- a real GitHub API request succeeds for the authorized repository while an unrelated repository causes no second outbound request;
+- CI, coverage, packaging, and CodeQL remain green.
 
-Product/plan availability for custom MCP apps changes over time; if the ChatGPT workspace does not expose custom MCP app creation, the same tunnel endpoint can be validated from another supported OpenAI surface or any MCP v2 client. Do not weaken Agent Authority security merely to work around a UI/plan limitation.
-
-## Pass/fail criterion
-
-The validation passes only if all of these are true:
-
-- the host discovers the authorized read-only tool
-- the authorized repository read succeeds
-- an out-of-mission repository is rejected before reaching the upstream tool
-- a write-capable tool is rejected before reaching the upstream tool
-- changing the host does not require changing the mission semantics
-
-If those conditions hold from ChatGPT and from at least one non-OpenAI MCP client, we have useful validation that Agent Authority is the policy layer rather than an OpenAI-specific connector.
+The next validation milestone is **not another framework**. It is a real two-service workflow where an authorized read from service A derives the concrete resource allowed for a side effect in service B.

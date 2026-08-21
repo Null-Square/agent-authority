@@ -1,4 +1,11 @@
+import { hashObject } from './index.js';
 import { createTaskLeaseGuard } from './guard.js';
+
+function authorityMappingError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
 
 function assertMapping(mapping, toolName = 'tool') {
   if (!mapping || typeof mapping !== 'object') throw new Error(`${toolName} authority mapping is required`);
@@ -36,9 +43,42 @@ async function requestContext(mapping, input, executionOptions) {
   return context;
 }
 
+function sameStringSet(left = [], right = []) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  const a = [...left].sort();
+  const b = [...right].sort();
+  return a.every((value, index) => value === b[index]);
+}
+
+function isSafeDerivationReplay(existing, derivation, value, receipt) {
+  const provenance = existing?.provenance;
+  if (!provenance || provenance.type !== 'derived') return false;
+  if (hashObject(existing.value) !== hashObject(value)) return false;
+  if (existing.kind !== (derivation.kind || 'opaque')) return false;
+  if (!sameStringSet(provenance.from, derivation.from)) return false;
+  if (provenance.selector !== derivation.selector.trim()) return false;
+  if (provenance.source_service !== receipt.service) return false;
+  if (provenance.source_action !== receipt.action) return false;
+  if (provenance.task_lease_id !== receipt.task_lease_id) return false;
+  return true;
+}
+
 async function applyDerivations({ lease, mapping, input, output, receipt, executionOptions }) {
   for (const derivation of mapping.derive || []) {
     const value = await derivation.value({ input, output, executionOptions });
+    const existing = lease.fact(derivation.fact_id);
+
+    // Agent loops commonly repeat safe reads. Re-deriving the exact same fact
+    // from the same mapping is a no-op; a changed value or provenance is a hard
+    // conflict so task authority cannot silently mutate underneath the agent.
+    if (existing) {
+      if (isSafeDerivationReplay(existing, derivation, value, receipt)) continue;
+      throw authorityMappingError(
+        'derived_fact_conflict',
+        `derived authority fact ${derivation.fact_id} already exists with different value or provenance`
+      );
+    }
+
     lease.derive({
       fact_id: derivation.fact_id,
       kind: derivation.kind || 'opaque',

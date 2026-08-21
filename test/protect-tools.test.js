@@ -43,6 +43,24 @@ function taskLease() {
   });
 }
 
+function protectedReadTool(lease, execute) {
+  return protectTool({ execute }, {
+    service: 'gmail',
+    action: 'thread.read',
+    context: ({ input }) => ({ thread: input.threadId }),
+    derive: [{
+      fact_id: 'fact:sender',
+      kind: 'email.address',
+      from: ['fact:thread'],
+      selector: 'output.sender',
+      value: ({ output }) => output.sender
+    }]
+  }, {
+    lease,
+    runtime: new AuthorityRuntime()
+  });
+}
+
 test('protectTool preserves tool shape and executes allowed effect once', async () => {
   let calls = 0;
   const tool = {
@@ -145,6 +163,40 @@ test('protected read can derive authority used by a later protected tool', async
     (error) => error.code === 'authority_delta_required'
   );
   assert.equal(calendarCalls, 1);
+});
+
+test('repeating the same authorized read reuses identical derived authority', async () => {
+  const lease = taskLease();
+  let reads = 0;
+  const wrapped = protectedReadTool(lease, async () => {
+    reads += 1;
+    return { sender: 'customer@example.com' };
+  });
+
+  await wrapped.execute({ threadId: 'thread:91' });
+  const first = lease.fact('fact:sender');
+  await wrapped.execute({ threadId: 'thread:91' });
+  const second = lease.fact('fact:sender');
+
+  assert.equal(reads, 2);
+  assert.equal(second.value, 'customer@example.com');
+  assert.equal(second.created_at, first.created_at);
+  assert.equal(second.provenance.receipt_id, first.provenance.receipt_id);
+});
+
+test('a repeated read cannot silently change an established derived fact', async () => {
+  const lease = taskLease();
+  let sender = 'customer@example.com';
+  const wrapped = protectedReadTool(lease, async () => ({ sender }));
+
+  await wrapped.execute({ threadId: 'thread:91' });
+  sender = 'attacker@example.com';
+
+  await assert.rejects(
+    () => wrapped.execute({ threadId: 'thread:91' }),
+    (error) => error.code === 'derived_fact_conflict'
+  );
+  assert.equal(lease.fact('fact:sender').value, 'customer@example.com');
 });
 
 test('protectTools fails closed when a tool has no authority mapping', () => {

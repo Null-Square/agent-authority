@@ -135,7 +135,7 @@ The demo performs this flow without provider credentials:
 
 ```text
 1. ALLOW read of one task-authorized Gmail thread
-2. derive sender email from that authorized read receipt
+2. derive sender email from that same Task Lease receipt
 3. ALLOW Calendar event for that sender
 4. REQUIRE_APPROVAL for a different attendee
 5. complete task
@@ -206,7 +206,7 @@ Agent Authority is deliberately **not tied to MCP, OAuth, or one agent framework
 agent code -> guard.run() -> existing SDK / API
 ```
 
-Best when the application already owns the provider connection.
+Best when the application already owns the provider connection. This is the primary v0.4 adoption path.
 
 ### 2. MCP gateway
 
@@ -238,7 +238,8 @@ The long-term validation target is the **same Task Lease and authority lineage a
 - durable mission revocation
 - Task Lease prototype
 - explicit authority roots
-- provenance-bound derived facts
+- same-lease provenance-bound derived facts
+- required parent lineage and trusted extraction selector
 - exact context-field bindings
 - authority-delta step-up signal
 - immediate task completion/expiry enforcement
@@ -324,7 +325,7 @@ Allow a natural workflow across mail, calendar, CRM and internal systems without
 1. **Task before credential.** A provider token is not task authority.
 2. **Mission is the ceiling.** Task Leases cannot override explicit denies.
 3. **No side effect before authorization.** Denied and step-up actions never execute.
-4. **Authority lineage matters.** Derived facts require an authorized receipt from the same mission.
+4. **Authority lineage matters.** Derived facts require an authorized receipt from the same Task Lease, at least one existing parent fact, and a recorded extraction selector.
 5. **No silent resource expansion.** A different concrete resource becomes an authority delta.
 6. **Task authority ends with the task.** Completion and expiry are independent from provider credential lifetime.
 7. **Authority may shrink, never silently grow.** Delegation and transport changes must preserve non-amplification.
@@ -346,7 +347,7 @@ This is still a validation implementation.
 - The encrypted local vault is not an OS keychain/KMS/HSM backend.
 - Remote authenticated deployment and a production approval UX are not complete.
 
-These are the next validation problems. We are intentionally not solving them with a giant policy language or another agent framework.
+These are follow-on validation problems. We are intentionally not solving them with a giant policy language or another agent framework.
 
 ## What we are deliberately not building
 

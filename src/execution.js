@@ -6,18 +6,9 @@ function executionFailure(mission, request, code, reason, extra = {}) {
 }
 
 export class InMemoryUsageLedger {
-  constructor() {
-    this.spending = new Map();
-  }
-
-  key(missionId, currency) {
-    return `${missionId}\u0000${currency || 'UNSPECIFIED'}`;
-  }
-
-  spent(missionId, currency) {
-    return this.spending.get(this.key(missionId, currency)) || 0;
-  }
-
+  constructor() { this.spending = new Map(); }
+  key(missionId, currency) { return `${missionId}\u0000${currency || 'UNSPECIFIED'}`; }
+  spent(missionId, currency) { return this.spending.get(this.key(missionId, currency)) || 0; }
   record(missionId, currency, amount) {
     const next = this.spent(missionId, currency) + Number(amount);
     this.spending.set(this.key(missionId, currency), next);
@@ -34,6 +25,8 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
   constructor(options = {}) {
     super(options);
     this.usage = options.usage || new InMemoryUsageLedger();
+    this.approvals = options.approvals || null;
+    this.executions = options.executions || null;
   }
 
   cumulativeBudgetCheck(mission, request) {
@@ -46,6 +39,9 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
     }
 
     const amount = Number(request.context.amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      return executionFailure(mission, request, 'invalid_amount', 'request amount must be a non-negative finite number');
+    }
     const alreadySpent = this.usage.spent(mission.mission_id, budget.currency);
     const nextTotal = alreadySpent + amount;
     if (nextTotal > Number(budget.amount)) {
@@ -57,37 +53,98 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
         { spent: alreadySpent, requested: amount, budget: Number(budget.amount), currency: budget.currency }
       );
     }
-
     return { amount, currency: budget.currency, alreadySpent, nextTotal };
   }
 
+  approvalCheck(missionInput, request, evaluation) {
+    if (evaluation.result.decision !== 'require_approval') return evaluation;
+    if (!this.approvals) return { ...evaluation, output: null };
+
+    const approvalId = request?.approval_id;
+    if (!approvalId) {
+      const approval = this.approvals.request({
+        mission: missionInput,
+        request,
+        reason: evaluation.result.reason
+      });
+      return { ...evaluation, approval, output: null };
+    }
+
+    try {
+      const approval = this.approvals.consume(approvalId, { mission: missionInput, request });
+      const result = {
+        decision: 'allow',
+        reason: 'authorized by one-time human approval',
+        approval_id: approval.approval_id
+      };
+      return {
+        result,
+        receipt: createReceipt({ mission: missionInput, request, result }),
+        approval
+      };
+    } catch (error) {
+      return executionFailure(missionInput, request, error.code || 'approval_invalid', error.message);
+    }
+  }
+
+  async readinessCheck(adapter, missionInput, request) {
+    if (typeof adapter.validateRequest === 'function') adapter.validateRequest(request);
+    if (typeof adapter.prepare !== 'function') return null;
+    const dispatch = await adapter.prepare({ mission: missionInput, request });
+    if (dispatch?.connection_required) {
+      return executionFailure(missionInput, request, 'connection_required', `no active ${request.service} connection for this principal`);
+    }
+    return null;
+  }
+
+  beginMutation(adapter, missionInput, request) {
+    if (!adapter.isMutation?.(request)) return null;
+    if (!this.executions) {
+      return executionFailure(missionInput, request, 'idempotency_store_unavailable', 'mutating action cannot run without an execution guard');
+    }
+    try {
+      return this.executions.begin({ mission: missionInput, request });
+    } catch (error) {
+      return executionFailure(
+        missionInput,
+        request,
+        error.code || 'idempotency_error',
+        error.message,
+        error.execution_record ? { execution: error.execution_record } : {}
+      );
+    }
+  }
+
   async execute(missionInput, request) {
-    const evaluation = this.evaluate(missionInput, request);
-    if (evaluation.result.decision !== 'allow') {
-      return { ...evaluation, output: null };
+    let evaluation = this.evaluate(missionInput, request);
+    if (evaluation.result.decision === 'deny') return { ...evaluation, output: null };
+
+    const adapter = this.adapters.resolve(request.service);
+    if (!adapter) {
+      return executionFailure(missionInput, request, 'adapter_unavailable', `no adapter is registered for ${request.service}`);
+    }
+    if (typeof adapter.execute !== 'function') {
+      return executionFailure(missionInput, request, 'execution_unavailable', `${adapter.kind || 'selected'} adapter cannot execute actions yet`);
     }
 
     const budgetCheck = this.cumulativeBudgetCheck(missionInput, request);
     if (budgetCheck?.result?.decision === 'deny') return budgetCheck;
 
-    const adapter = this.adapters.resolve(request.service);
-    if (!adapter) {
-      return executionFailure(
-        missionInput,
-        request,
-        'adapter_unavailable',
-        `no adapter is registered for ${request.service}`
-      );
+    try {
+      const readinessFailure = await this.readinessCheck(adapter, missionInput, request);
+      if (readinessFailure) return readinessFailure;
+    } catch (error) {
+      if (error?.code === 'connection_required') {
+        return executionFailure(missionInput, request, 'connection_required', error.message);
+      }
+      return executionFailure(missionInput, request, error.code || 'invalid_provider_request', error.message);
     }
 
-    if (typeof adapter.execute !== 'function') {
-      return executionFailure(
-        missionInput,
-        request,
-        'execution_unavailable',
-        `${adapter.kind || 'selected'} adapter cannot execute actions yet`
-      );
-    }
+    evaluation = this.approvalCheck(missionInput, request, evaluation);
+    if (evaluation.result.decision !== 'allow') return { ...evaluation, output: null };
+
+    const executionRecord = this.beginMutation(adapter, missionInput, request);
+    if (executionRecord?.result?.decision === 'deny') return executionRecord;
 
     try {
       const output = await adapter.execute({ mission: missionInput, request });
@@ -100,8 +157,14 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
           remaining: Math.max(0, Number(missionInput.constraints.budget.amount) - spent)
         };
       }
-      return { ...evaluation, output, usage };
+      if (executionRecord && this.executions) {
+        this.executions.complete({ mission: missionInput, request, receipt_id: evaluation.receipt?.receipt_id || null });
+      }
+      return { ...evaluation, output, usage, execution: executionRecord || null };
     } catch (error) {
+      if (executionRecord && this.executions) {
+        this.executions.uncertain({ mission: missionInput, request, error_code: error.code || 'provider_error' });
+      }
       if (error?.code === 'connection_required') {
         return executionFailure(missionInput, request, 'connection_required', error.message);
       }

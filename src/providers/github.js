@@ -1,5 +1,7 @@
 import { brokeredProviderAdapter } from '../connections.js';
 
+const MUTATING_ACTIONS = new Set(['issue.create', 'pull_request.create', 'repo.contents.write']);
+
 function required(value, name) {
   if (value === undefined || value === null || value === '') throw new Error(`${name} is required`);
   return value;
@@ -96,7 +98,7 @@ export function createGitHubProviderAdapter({ broker, fetchImpl = globalThis.fet
   if (!broker) throw new Error('credential broker is required');
   if (typeof fetchImpl !== 'function') throw new Error('fetch implementation is required');
 
-  return brokeredProviderAdapter({
+  const adapter = brokeredProviderAdapter({
     kind: 'github-rest',
     services: ['github'],
     broker,
@@ -112,7 +114,7 @@ export function createGitHubProviderAdapter({ broker, fetchImpl = globalThis.fet
           authorization: `Bearer ${token}`,
           'content-type': 'application/json',
           'x-github-api-version': '2022-11-28',
-          'user-agent': 'nullsquare-agent-authority/0.1'
+          'user-agent': 'nullsquare-agent-authority/0.3'
         },
         body: operation.body ? JSON.stringify(operation.body) : undefined
       });
@@ -141,4 +143,7 @@ export function createGitHubProviderAdapter({ broker, fetchImpl = globalThis.fet
       return output;
     }
   });
+
+  adapter.isMutation = (request) => MUTATING_ACTIONS.has(request?.action);
+  return adapter;
 }

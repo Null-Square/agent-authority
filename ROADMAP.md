@@ -17,30 +17,36 @@ The project is intentionally implementation-first. We want to discover the small
 
 ## M1 — Real agent integrations
 
-- [ ] integrate one coding-agent/tool-middleware harness
+- [x] add hosted-harness connector bridge mode for platforms that keep OAuth credentials internal
+- [x] dogfood one mission across real GitHub + Gmail harness-managed connectors without exposing provider credentials to Agent Authority
+- [ ] integrate one coding-agent/tool-middleware harness with non-bypassable connector middleware
 - [ ] integrate one MCP client through an authority proxy
-- [ ] integrate one connector-style SaaS tool
+- [ ] integrate one connector-style SaaS tool through a reusable platform adapter
 - [ ] define an interoperability fixture suite
-- [ ] build a CLI `evaluate` command and local mission loader
+- [x] build CLI mission validation/evaluation and local mission loader
 
-Success criterion: the same mission semantics govern actions from at least three different harness styles.
+Success criterion: the same mission semantics govern actions from at least three different harness styles, with at least one integration enforcing the grant outside model-controlled code.
 
 ## M2 — Credential isolation
 
 - [ ] OAuth/OIDC adapter with real short-lived token flow
+- [x] encrypted local credential vault for development/pre-alpha use
+- [ ] OS keychain/KMS-backed production vault backend
 - [ ] API-key vault reference adapter
 - [ ] cloud temporary-credential adapter
 - [ ] CLI child-process credential injection
-- [ ] threat tests for secret exfiltration and confused-deputy attacks
+- [x] threat tests for identity substitution, approval replay, request substitution and duplicate mutation execution
+- [ ] broader secret-exfiltration and confused-deputy threat suite
 
 Success criterion: an agent can execute authorized actions without receiving the long-lived root credential in its model context.
 
 ## M3 — Human approvals + identity
 
-- [ ] portable approval request format
-- [ ] terminal approval UI
+- [x] durable approval request format
+- [x] terminal approval administration commands
+- [x] short-lived signed agent-instance tokens
 - [ ] web/mobile approval prototype
-- [ ] agent runtime identity binding experiment
+- [ ] platform-native agent runtime identity binding
 - [ ] signed mission-manifest experiment
 - [ ] signed receipt experiment
 

@@ -2,10 +2,11 @@
 import { readFileSync } from 'node:fs';
 import { stdin as input } from 'node:process';
 import { assertMission, evaluateMissionPolicy } from './index.js';
+import { createAgentToken, parseTtl } from './agent-auth.js';
 import { createRuntimeEnvironment } from './runtime-env.js';
 import { authorityHome, ensureAuthorityHome, loadConfig, saveConfig } from './storage.js';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 function fail(message, code = 1) {
   console.error(`error: ${message}`);
@@ -30,7 +31,46 @@ async function readStdinSecret() {
 }
 
 function help() {
-  console.log(`Agent Authority ${VERSION}\n\nUsage:\n  agent-authority setup [--principal user:id] [--home PATH]\n  agent-authority status [--home PATH]\n  agent-authority doctor [--home PATH]\n  agent-authority serve [--host HOST] [--port PORT] [--home PATH]\n  agent-authority connections [--home PATH]\n  agent-authority connect github --token-stdin [--account ID] [--no-verify]\n  agent-authority disconnect github [--account ID]\n  agent-authority mission validate FILE\n  agent-authority mission evaluate FILE --service NAME --action NAME [--repository OWNER/REPO] [--context JSON]\n\nSecurity:\n  Credentials are never accepted as command-line values. Use stdin or future browser OAuth flows.\n\nEnvironment:\n  AGENT_AUTHORITY_HOME   Override ~/.agent-authority\n  AGENT_AUTHORITY_HOST   Override serve host\n  AGENT_AUTHORITY_PORT   Override serve port`);
+  console.log(`Agent Authority ${VERSION}
+
+Usage:
+  agent-authority setup [--principal user:id] [--home PATH]
+  agent-authority status [--home PATH]
+  agent-authority doctor [--home PATH]
+  agent-authority config show [--home PATH]
+  agent-authority serve [--host HOST] [--port PORT] [--home PATH]
+
+MCP gateway (read-only first milestone):
+  agent-authority mcp proxy --upstream URL --mission FILE [--service mcp:NAME] [--port 8790]
+
+Connections:
+  agent-authority connections [--home PATH]
+  agent-authority connect github --token-stdin [--account ID] [--no-verify]
+  agent-authority disconnect github [--account ID]
+
+Agent instances:
+  agent-authority agent token --agent AGENT_ID [--mission MISSION_ID] [--ttl 1h]
+  agent-authority agent token --agent AGENT_ID --admin [--ttl 15m]
+
+Human approvals:
+  agent-authority approvals list [--status pending]
+  agent-authority approvals approve APPROVAL_ID
+  agent-authority approvals deny APPROVAL_ID
+
+Missions:
+  agent-authority mission validate FILE
+  agent-authority mission evaluate FILE --service NAME --action NAME [--repository OWNER/REPO] [--context JSON]
+
+Security:
+  Provider credentials are never accepted as command-line values.
+  Daemon /v1 APIs require short-lived signed agent-instance bearer tokens.
+  Human approvals are one-time and bound to the exact mission + request.
+  MCP proxy binds loopback only and exposes only tools explicitly declared read-only.
+
+Environment:
+  AGENT_AUTHORITY_HOME   Override ~/.agent-authority
+  AGENT_AUTHORITY_HOST   Override serve host
+  AGENT_AUTHORITY_PORT   Override serve port`);
 }
 
 async function setup(args) {
@@ -42,10 +82,12 @@ async function setup(args) {
     config.principal_id = principal;
     saveConfig(config, { home });
   }
-  console.log(`Agent Authority initialized at ${home}`);
+  const env = createRuntimeEnvironment({ home });
+  env.secrets.key();
+  console.log(`✓ Agent Authority initialized at ${home}`);
   console.log(`Principal: ${principal}`);
   console.log('Next: agent-authority doctor');
-  console.log('Then: connect a provider, e.g. GitHub.');
+  console.log('Then connect a provider and issue a short-lived token to an agent harness.');
 }
 
 function safeConnection(c) {
@@ -57,7 +99,16 @@ async function status(args) {
   const home = homeFrom(args);
   const env = createRuntimeEnvironment({ home });
   const connections = env.broker.listConnections(env.config.principal_id);
-  json({ version: VERSION, home, principal_id: env.config.principal_id, server: env.config.server, connections });
+  const pendingApprovals = env.approvals.list({ principal_id: env.config.principal_id, status: 'pending' }).length;
+  json({
+    version: VERSION,
+    home,
+    principal_id: env.config.principal_id,
+    server: env.config.server,
+    connections,
+    pending_approvals: pendingApprovals,
+    api_authentication: 'agent-instance-bearer-token'
+  });
 }
 
 async function doctor(args) {
@@ -68,7 +119,9 @@ async function doctor(args) {
     checks.push({ check: 'config', ok: true, path: `${home}/config.json` });
     env.secrets.key();
     checks.push({ check: 'encrypted-vault', ok: true, path: env.config.paths.secrets });
+    checks.push({ check: 'agent-signing-key', ok: env.agentAuthKey.length === 32, path: env.agentAuthKeyPath });
     checks.push({ check: 'connections-store', ok: true, count: env.broker.listConnections(env.config.principal_id).length });
+    checks.push({ check: 'approval-store', ok: true, pending: env.approvals.list({ principal_id: env.config.principal_id, status: 'pending' }).length });
     checks.push({ check: 'loopback-default', ok: env.config.server.host === '127.0.0.1' || env.config.server.host === '::1', host: env.config.server.host });
   } catch (error) {
     checks.push({ check: 'runtime', ok: false, error: error.message });
@@ -77,8 +130,21 @@ async function doctor(args) {
   if (checks.some((c) => !c.ok)) process.exitCode = 2;
 }
 
+async function configCommand(args) {
+  const sub = args.shift();
+  if (sub !== 'show') throw new Error('config command currently supports `show`');
+  const home = homeFrom(args);
+  json({ home, ...loadConfig({ home }) });
+}
+
+async function connectionsCommand(args) {
+  const home = homeFrom(args);
+  const env = createRuntimeEnvironment({ home });
+  json({ connections: env.broker.listConnections(env.config.principal_id) });
+}
+
 async function connectGitHub(args) {
-  if (!has(args, '--token-stdin')) throw new Error('GitHub currently requires --token-stdin; browser OAuth is the next provider-onboarding milestone');
+  if (!has(args, '--token-stdin')) throw new Error('GitHub currently requires --token-stdin; browser OAuth/PKCE is the next provider-onboarding milestone');
   const home = homeFrom(args);
   const env = createRuntimeEnvironment({ home });
   const token = await readStdinSecret();
@@ -121,6 +187,58 @@ async function disconnectGitHub(args) {
   console.log(`✓ GitHub ${accountId} disconnected and local credential removed`);
 }
 
+async function agentCommand(args) {
+  const sub = args.shift();
+  if (sub !== 'token') throw new Error('agent command currently supports `token`');
+  const home = homeFrom(args);
+  const env = createRuntimeEnvironment({ home });
+  const agentId = flag(args, '--agent');
+  if (!agentId) throw new Error('--agent AGENT_ID is required');
+  const missionId = flag(args, '--mission', null);
+  const ttl = parseTtl(flag(args, '--ttl', has(args, '--admin') ? '15m' : '1h'));
+  const capabilities = has(args, '--admin')
+    ? ['*']
+    : (flag(args, '--capabilities')
+      ? flag(args, '--capabilities').split(',').map((v) => v.trim()).filter(Boolean)
+      : ['evaluate', 'prepare', 'execute', 'approval.read']);
+  const token = createAgentToken({
+    key: env.agentAuthKey,
+    principal_id: env.config.principal_id,
+    agent_id: agentId,
+    mission_id: missionId,
+    capabilities,
+    ttl_seconds: ttl
+  });
+  if (has(args, '--json')) {
+    json({ token, agent_id: agentId, mission_id: missionId, ttl_seconds: ttl, capabilities });
+  } else {
+    console.log(token);
+  }
+}
+
+async function approvalsCommand(args) {
+  const sub = args.shift();
+  const home = homeFrom(args);
+  const env = createRuntimeEnvironment({ home });
+  if (sub === 'list') {
+    const statusFilter = flag(args, '--status');
+    return json({ approvals: env.approvals.list({ principal_id: env.config.principal_id, status: statusFilter }) });
+  }
+  const approvalId = args.shift();
+  if (!approvalId) throw new Error('approval id is required');
+  if (sub === 'approve') {
+    const result = env.approvals.approve(approvalId, { principal_id: env.config.principal_id });
+    console.log(`✓ approved ${approvalId}`);
+    return json(result);
+  }
+  if (sub === 'deny') {
+    const result = env.approvals.deny(approvalId, { principal_id: env.config.principal_id });
+    console.log(`✓ denied ${approvalId}`);
+    return json(result);
+  }
+  throw new Error('approvals command must be `list`, `approve`, or `deny`');
+}
+
 function loadMission(path) {
   if (!path) throw new Error('mission file is required');
   return JSON.parse(readFileSync(path, 'utf8'));
@@ -150,6 +268,41 @@ async function missionCommand(args) {
   throw new Error('mission command must be `validate` or `evaluate`');
 }
 
+async function mcpCommand(args) {
+  const sub = args.shift();
+  if (sub !== 'proxy') throw new Error('mcp command currently supports `proxy`');
+  const upstreamUrl = flag(args, '--upstream');
+  const missionPath = flag(args, '--mission');
+  if (!upstreamUrl) throw new Error('--upstream URL is required');
+  if (!missionPath) throw new Error('--mission FILE is required');
+
+  const home = homeFrom(args);
+  const env = createRuntimeEnvironment({ home });
+  const mission = assertMission(loadMission(missionPath));
+  if (mission.principal.id !== env.config.principal_id) {
+    throw new Error(`mission principal ${mission.principal.id} does not match local principal ${env.config.principal_id}`);
+  }
+
+  const host = flag(args, '--host', '127.0.0.1');
+  const port = Number(flag(args, '--port', '8790'));
+  const service = flag(args, '--service', 'mcp:upstream');
+  const { startMcpProxyServer } = await import('./mcp-server.js');
+  const instance = await startMcpProxyServer({
+    mission,
+    runtime: env.runtime,
+    upstreamUrl,
+    service,
+    host,
+    port
+  });
+  console.log(`✓ Agent Authority MCP gateway listening on http://${instance.host}:${instance.port}/mcp`);
+  console.log(`Mission: ${mission.mission_id}`);
+  console.log(`Service: ${service}`);
+  console.log(`Upstream: ${upstreamUrl}`);
+  console.log('Mode: read-only (write tools are not advertised or callable)');
+  return instance;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const command = args.shift();
@@ -158,8 +311,12 @@ async function main() {
   if (command === 'setup' || command === 'init') return setup(args);
   if (command === 'status') return status(args);
   if (command === 'doctor') return doctor(args);
-  if (command === 'connections') return status(args);
+  if (command === 'config') return configCommand(args);
+  if (command === 'connections') return connectionsCommand(args);
+  if (command === 'agent') return agentCommand(args);
+  if (command === 'approvals') return approvalsCommand(args);
   if (command === 'mission') return missionCommand(args);
+  if (command === 'mcp') return mcpCommand(args);
   if (command === 'connect') {
     if (args.shift() !== 'github') throw new Error('only the GitHub native connection is implemented today');
     return connectGitHub(args);

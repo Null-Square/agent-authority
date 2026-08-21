@@ -90,16 +90,30 @@ export class CredentialBroker {
 
   connect({ principal_id, service, account_id = 'default', auth_kind, credential, scopes = [], metadata = {} }) {
     if (credential === undefined || credential === null) throw new Error('credential is required');
+
+    const previous = this.connections.get({ principal_id, service, account_id });
     const credential_ref = this.secrets.put(credential);
-    return this.connections.connect({
-      principal_id,
-      service,
-      account_id,
-      auth_kind,
-      credential_ref,
-      scopes,
-      metadata
-    });
+    let connection;
+
+    try {
+      connection = this.connections.connect({
+        principal_id,
+        service,
+        account_id,
+        auth_kind,
+        credential_ref,
+        scopes,
+        metadata
+      });
+    } catch (error) {
+      this.secrets.delete(credential_ref);
+      throw error;
+    }
+
+    if (previous?.credential_ref && previous.credential_ref !== credential_ref) {
+      this.secrets.delete(previous.credential_ref);
+    }
+    return connection;
   }
 
   getConnection({ principal_id, service, account_id = 'default' }) {

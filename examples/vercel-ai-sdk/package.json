@@ -1,0 +1,14 @@
+{
+  "name": "agent-authority-vercel-ai-sdk-validation",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node index.js"
+  },
+  "dependencies": {
+    "@nullsquare/agent-authority": "file:../..",
+    "ai": "7.0.68",
+    "zod": "^4.0.0"
+  }
+}

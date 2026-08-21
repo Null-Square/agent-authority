@@ -49,9 +49,9 @@ function taskReceipt(lease, request, result) {
  * not already authorize.
  *
  * Roots are values explicitly approved at task entry. Derived facts must be
- * anchored to a successful receipt from the same mission, so authority can
- * follow resources discovered during authorized execution without becoming a
- * standing wildcard permission.
+ * anchored to an ALLOW receipt produced inside the same lease and to at least
+ * one existing authority fact. This lets authority follow resources discovered
+ * during authorized execution without becoming a standing wildcard permission.
  */
 export class TaskLease {
   constructor({
@@ -95,7 +95,7 @@ export class TaskLease {
     return structuredClone(fact);
   }
 
-  derive({ fact_id, kind = 'opaque', value, from = [], receipt, selector = null } = {}) {
+  derive({ fact_id, kind = 'opaque', value, from = [], receipt, selector } = {}) {
     if (!fact_id) throw new Error('derived fact_id is required');
     if (value === undefined) throw new Error('derived value is required');
     if (this.facts.has(fact_id)) throw authorityError('fact_exists', `authority fact ${fact_id} already exists`);
@@ -104,8 +104,17 @@ export class TaskLease {
     if (receipt.mission_id !== this.mission.mission_id) {
       throw authorityError('receipt_mission_mismatch', 'source receipt belongs to another mission');
     }
+    if (receipt.task_lease_id !== this.lease_id) {
+      throw authorityError('receipt_lease_mismatch', 'source receipt belongs to another task lease');
+    }
+    if (typeof selector !== 'string' || selector.trim() === '') {
+      throw authorityError('selector_required', 'derived authority must record the trusted output selector used to obtain the value');
+    }
 
     const parents = [...new Set(from)];
+    if (parents.length === 0) {
+      throw authorityError('parent_fact_required', 'derived authority must descend from at least one existing task authority fact');
+    }
     for (const parentId of parents) {
       if (!this.facts.has(parentId)) throw authorityError('parent_fact_missing', `authority fact ${parentId} does not exist`);
     }
@@ -117,9 +126,13 @@ export class TaskLease {
       provenance: {
         type: 'derived',
         from: parents,
+        task_lease_id: this.lease_id,
         receipt_id: receipt.receipt_id,
         receipt_hash: receipt.receipt_hash,
-        selector
+        source_service: receipt.service,
+        source_action: receipt.action,
+        source_request_hash: receipt.request_hash,
+        selector: selector.trim()
       },
       created_at: new Date().toISOString()
     };
@@ -200,7 +213,7 @@ export class TaskLease {
 
     // The mission remains the ceiling. A task lease can only narrow an action
     // that the mission already permits; it can never override DENY or approval.
-    const base = runtime.evaluate(this.mission, request);
+    const base = runtime.evaluate(this.mission, request, now);
     if (base.result.decision !== 'allow') {
       return { result: base.result, receipt: taskReceipt(this, request, base.result) };
     }

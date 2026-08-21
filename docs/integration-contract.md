@@ -5,57 +5,81 @@ Agent Authority should fit an existing agent stack without becoming its harness,
 The core contract is intentionally small:
 
 ```text
+human task
+   |
+   v
+Task Lease
+   |
+   v
 proposed action
-      |
-      v
-Agent Authority mission evaluation
-      |
-      +-- DENY ------------> no side effect
-      |
-      +-- REQUIRE_APPROVAL -> no side effect until approved
-      |
-      +-- ALLOW -----------> execute through the host's existing connection
-      |
-      v
-receipt
+   |
+   v
+Agent Authority evaluation
+   |
+   +-- DENY ------------> no side effect
+   |
+   +-- REQUIRE_APPROVAL -> no side effect until authority expands explicitly
+   |
+   +-- ALLOW -----------> execute through the host's existing connection
+   |
+   v
+receipt / derived facts / task completion
 ```
+
+The mission remains the static authority ceiling. The Task Lease is the temporary task boundary developers should normally integrate against.
+
+## Action model
 
 A proposed action is described semantically:
 
 ```json
 {
-  "service": "github",
-  "action": "repo.read",
+  "service": "calendar",
+  "action": "event.create",
   "context": {
-    "repository": "Null-Square/agent-authority"
+    "attendee": "customer@example.com"
   }
 }
 ```
 
-The mission remains the authority source. The transport does not.
+A Task Lease may bind that context value to a fact legitimately discovered earlier in the same task.
 
-## 1. In-process guard — smallest integration
+```text
+Gmail thread root
+      |
+authorized read receipt
+      |
+derived sender fact
+      |
+Calendar attendee binding
+```
 
-For an application that already has an SDK/client connection:
+A different attendee is not silently authorized. It becomes an authority delta.
+
+## 1. In-process guard — primary developer path
+
+For an application that already owns its SDK/client connection:
 
 ```js
 import { AuthorityRuntime } from '@nullsquare/agent-authority';
-import { createAuthorityGuard } from '@nullsquare/agent-authority/guard';
+import { createTaskLease } from '@nullsquare/agent-authority/task-lease';
+import { createTaskLeaseGuard } from '@nullsquare/agent-authority/guard';
 
-const guard = createAuthorityGuard({ mission, runtime: new AuthorityRuntime() });
+const lease = createTaskLease({ mission, roots, bindings });
+const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
 
-const { output, receipt } = await guard.run({
-  service: 'stripe',
-  action: 'refund.create',
-  context: { account: 'acct_123', amount: 2000, currency: 'USD' }
-}, () => stripe.refunds.create({ payment_intent: 'pi_123' }));
+await guard.run({
+  service: 'calendar',
+  action: 'event.create',
+  context: { attendee: 'customer@example.com' }
+}, () => calendar.createEvent(...));
 ```
 
-The callback is never invoked on DENY or REQUIRE_APPROVAL. The host retains its provider credentials.
+The callback is never invoked on `DENY` or `REQUIRE_APPROVAL`. The host retains its provider credentials.
 
-Use this for Node/TypeScript agents, workers, backend services, SDK wrappers, and custom tool runtimes.
+This is the clearest adoption path today because it does not require MCP, a daemon, or a new authentication flow.
 
-## 2. MCP gateway — existing MCP hosts
+## 2. MCP gateway — adapter for MCP hosts
 
 For ChatGPT, Claude, Codex, OpenClaw, IDEs, or other MCP-capable hosts:
 
@@ -63,9 +87,9 @@ For ChatGPT, Claude, Codex, OpenClaw, IDEs, or other MCP-capable hosts:
 host -> Agent Authority MCP gateway -> existing MCP server
 ```
 
-The gateway enforces the same mission model before forwarding `tools/call`. MCP is an adapter, not Agent Authority's core abstraction.
+The gateway should enforce the same Task Lease immediately before forwarding `tools/call`. MCP is an adapter, not Agent Authority's core abstraction.
 
-## 3. Brokered execution — keep credentials outside the host
+## 3. Brokered execution — credential isolation
 
 When the host should not own the provider credential:
 
@@ -73,17 +97,20 @@ When the host should not own the provider credential:
 agent -> Agent Authority -> credential broker -> provider
 ```
 
-Agent Authority resolves the connected account internally and returns only sanitized provider output.
+Agent Authority resolves the connected account internally and returns only sanitized provider output. The same Task Lease semantics must still apply.
 
-## Integration invariant
+## Conformance invariant
 
 Regardless of transport, an integration is conformant only if:
 
-1. the side effect cannot occur before an ALLOW decision (or a completed approval flow),
-2. the request evaluated is the request executed,
-3. mission/resource constraints cannot be bypassed by switching transport,
-4. long-lived credentials are not copied into model context by Agent Authority,
-5. a receipt can identify the mission, agent, service, action, and request hash.
+1. the side effect cannot occur before an `ALLOW` decision or completed step-up;
+2. the request evaluated is the request executed;
+3. the mission remains the authority ceiling;
+4. derived authority is anchored to an `ALLOW` receipt from the same Task Lease and existing parent facts;
+5. a different concrete resource cannot silently inherit authority;
+6. task completion or expiry stops later task actions;
+7. switching transport cannot broaden authority;
+8. a receipt can identify the mission, Task Lease, agent, service, action, and request hash.
 
 This invariant is more important than any specific protocol.
 
@@ -91,11 +118,15 @@ This invariant is more important than any specific protocol.
 
 Adopting Agent Authority should not require replacing:
 
-- the agent harness,
-- OAuth/OIDC,
-- MCP,
-- the provider SDK,
-- existing secret storage,
+- the agent harness;
+- OAuth/OIDC;
+- MCP;
+- provider SDKs;
+- existing secret storage;
 - an organization's IAM system.
 
-Those systems can remain in place. Agent Authority adds the bounded human authority decision immediately before an agent-originated side effect.
+Those systems can remain in place. Agent Authority adds the temporary task-authority decision immediately before an agent-originated side effect.
+
+## Current trust boundary
+
+The v0.4 prototype records provenance for derived facts, including source receipt and selector. The trusted host/adapter still supplies the extracted value. This is an explicit validation-stage trust assumption, not a cryptographic guarantee.

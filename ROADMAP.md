@@ -1,82 +1,149 @@
 # Agent Authority Roadmap
 
-The project is intentionally implementation-first. We want to discover the smallest interoperable authority layer through real agent-harness integrations before declaring a protocol standard.
+Agent Authority is implementation-first. We are not trying to invent a new authentication protocol or policy language.
 
-## M0 — Public bootstrap
+The product thesis we are validating is:
 
-- [x] mission manifest concept
-- [x] allow / deny / require-approval policy outcomes
-- [x] expiry, budgets, delegation depth
-- [x] subagent attenuation guard
+> **Give an agent a task, not standing account permissions.**
+
+A human-approved task becomes temporary execution authority. As the agent discovers concrete resources through authorized work, authority may follow those resources through provenance-bound facts, but it may never silently broaden.
+
+## Current invariant
+
+```text
+Task Lease authority <= Mission authority
+```
+
+Across delegation and integrations:
+
+```text
+authority may stay the same or shrink
+never silently grow
+```
+
+## M0 — Enforcement foundation — complete
+
+- [x] mission validation
+- [x] allow / deny / require-approval outcomes
+- [x] explicit deny precedence
+- [x] resource constraints
+- [x] expiry and budgets
+- [x] delegation attenuation
 - [x] mission revocation
-- [x] action receipts
-- [x] adapter abstraction
-- [x] local HTTP sidecar
-- [x] runnable demo and tests
-- [x] public architecture and contribution docs
+- [x] action receipts and request hashes
+- [x] protocol-neutral `guard.run()` enforcement
+- [x] one-time approvals
+- [x] mutation idempotency
+- [x] short-lived local agent-instance auth
+- [x] encrypted development credential vault
+- [x] GitHub brokered execution
+- [x] MCP v2 gateway proof
+- [x] harness-managed connector grant proof
+- [x] Node 20/22 CI, coverage, package checks and CodeQL
 
-## M1 — Real agent integrations
+## M1 — Task Lease / derived-authority proof — current
 
-- [x] add hosted-harness connector bridge mode for platforms that keep OAuth credentials internal
-- [x] dogfood one mission across real GitHub + Gmail harness-managed connectors without exposing provider credentials to Agent Authority
-- [ ] integrate one coding-agent/tool-middleware harness with non-bypassable connector middleware
-- [ ] integrate one MCP client through an authority proxy
-- [ ] integrate one connector-style SaaS tool through a reusable platform adapter
-- [ ] define an interoperability fixture suite
-- [x] build CLI mission validation/evaluation and local mission loader
+- [x] Task Lease object around an existing mission
+- [x] explicit authority roots
+- [x] derived facts anchored to same-mission `ALLOW` receipts
+- [x] parent-fact lineage
+- [x] exact context-field bindings
+- [x] unresolved facts fail closed
+- [x] resource mismatch becomes an authority-delta step-up signal
+- [x] explicit mission deny remains the ceiling
+- [x] task completion immediately removes authority
+- [x] independent task-lease expiry
+- [x] task-lease ID/hash in receipts
+- [x] self-contained cross-system demo: Gmail-thread fact -> Calendar attendee
+- [ ] exercise the same pattern against two real provider operations
 
-Success criterion: the same mission semantics govern actions from at least three different harness styles, with at least one integration enforcing the grant outside model-controlled code.
+**Success criterion:** a real multi-step agent workflow discovers a resource during an authorized read and can use exactly that resource in a later side effect, while an unrelated resource is technically blocked without requiring approval for every normal task step.
 
-## M2 — Credential isolation
+## M2 — Durable task execution
 
-- [ ] OAuth/OIDC adapter with real short-lived token flow
-- [x] encrypted local credential vault for development/pre-alpha use
-- [ ] OS keychain/KMS-backed production vault backend
-- [ ] API-key vault reference adapter
-- [ ] cloud temporary-credential adapter
-- [ ] CLI child-process credential injection
-- [x] threat tests for identity substitution, approval replay, request substitution and duplicate mutation execution
-- [ ] broader secret-exfiltration and confused-deputy threat suite
+Build only what the real M1 workflow proves necessary.
 
-Success criterion: an agent can execute authorized actions without receiving the long-lived root credential in its model context.
+- [ ] durable Task Lease persistence/recovery
+- [ ] atomic fact/binding updates
+- [ ] approved authority delta can safely attenuate/update a live lease
+- [ ] completion state survives process restart
+- [ ] durable lineage query: why was this exact action authorized?
+- [ ] concurrency tests for multiple agent workers operating under one lease
 
-## M3 — Human approvals + identity
+**Success criterion:** a Task Lease survives daemon/process restarts without gaining authority or losing its provenance lineage.
 
-- [x] durable approval request format
-- [x] terminal approval administration commands
-- [x] short-lived signed agent-instance tokens
-- [ ] web/mobile approval prototype
-- [ ] platform-native agent runtime identity binding
-- [ ] signed mission-manifest experiment
+## M3 — Trustworthy derived facts
+
+Today the trusted host/adapter supplies the derived value and selector. This is an explicit v0.4 limitation.
+
+- [ ] define a small adapter contract for extracting authority-relevant fields from provider results
+- [ ] bind derived fact records to provider/result evidence where practical
+- [ ] adversarial tests for forged extraction, confused-deputy mappings and stale facts
+- [ ] conformance fixture for operation -> resource-context mappings
+- [ ] define invalidation rules when a source resource changes
+
+Do **not** build a general semantic policy language unless real integrations require it.
+
+**Success criterion:** an adapter cannot claim a value was derived from an authorized operation without satisfying the documented extraction/evidence contract.
+
+## M4 — Same task, multiple transports
+
+Prove Agent Authority is not an MCP product or SDK wrapper.
+
+- [ ] same Task Lease through ordinary `guard.run()` SDK call
+- [ ] same Task Lease through MCP gateway
+- [ ] same Task Lease through brokered provider execution
+- [ ] at least one non-bypassable harness/tool-middleware integration
+- [ ] interoperability test vectors across transports
+
+**Success criterion:** changing transport or harness does not expand the task's authority.
+
+## M5 — Production credential and approval UX
+
+Only after the task-bound enforcement model is validated.
+
+- [ ] GitHub browser/App onboarding instead of token-stdin
+- [ ] reusable OAuth/OIDC connection engine
+- [ ] OS keychain / KMS-backed secret backend
+- [ ] automatic short-lived agent session bootstrap
+- [ ] compact approval UI showing the exact authority delta
 - [ ] signed receipt experiment
 
-## M4 — MCP and legacy compatibility
+**Success criterion:** an external developer can install Agent Authority, connect one real provider, authorize one task, and complete it without exposing a long-lived credential to the model.
 
-- [ ] production-grade MCP authority proxy
-- [ ] OAuth discovery/token-exchange mapping
-- [ ] browser/session broker threat model
-- [ ] isolated legacy-browser proof of concept
-- [ ] service capability discovery experiment
+## M6 — Ecosystem and contribution layer
 
-## M5 — Delegated agent networks
+- [ ] adapter/conformance starter template
+- [ ] framework integration examples
+- [ ] `good first issue` tasks based on real mappings/tests
+- [ ] independent contributor implementation of one adapter
+- [ ] release packaging and npm publication
+- [ ] documentation site only when README/docs become too large
 
-- [ ] recursive child missions
-- [ ] cryptographically verifiable delegation chain
-- [ ] durable revocation propagation
-- [ ] cross-agent receipt lineage
-- [ ] multi-agent concurrency and budget accounting
+## M7 — Standards interoperability
 
-## M6 — Open specification candidate
+Only after operational evidence.
 
-Only after interoperability evidence:
+- [ ] map Task Lease concepts to emerging task/intent authorization work
+- [ ] accept external authorization envelopes where useful
+- [ ] avoid creating a competing identity/token standard
+- [ ] publish stable test vectors for non-amplification and authority lineage
+- [ ] evaluate an appropriate standards venue only if multiple independent implementations exist
 
-- [ ] formalize mission schema
-- [ ] formalize capability naming/discovery
-- [ ] formalize approval and receipt objects
-- [ ] map cleanly to OAuth, MCP authorization, workload identity, and emerging agent-auth standards
-- [ ] publish independent implementation test vectors
-- [ ] evaluate appropriate standards venue
+## What we are not prioritizing
+
+- another agent harness
+- a new OAuth replacement
+- an MCP replacement
+- a giant connector marketplace
+- a proprietary universal policy DSL
+- a dashboard-first enterprise product
+- A2A support before task-bound tool execution is validated
 
 ## Research questions
 
-We actively want competing proposals for token format, capability vocabulary, agent identity, approval portability, receipt logging, browser isolation, and mapping mission context into existing/future OAuth authorization mechanisms.
+1. What is the smallest trustworthy representation of an authority-relevant derived fact?
+2. How should an approved authority delta update a running task without opening a broader wildcard permission?
+3. How should source-data changes invalidate downstream derived authority?
+4. What provider/tool metadata is required to map operations to resource context reliably?
+5. Can the same non-amplification conformance suite work across SDK, MCP, CLI and brokered execution?

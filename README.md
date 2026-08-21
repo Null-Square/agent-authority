@@ -1,50 +1,125 @@
 <div align="center">
 
-![Agent Authority — mission-scoped authorization for AI agents](docs/assets/agent-authority-cover.svg)
+![Agent Authority](docs/assets/agent-authority-cover.svg)
 
 # Agent Authority
 
-### A protocol-neutral authority layer for AI agent actions
+### Give your agent a task, not your account.
 
-**Give an agent a bounded human-approved mission. Enforce it immediately before side effects—through SDKs, MCP, brokered credentials, or harness middleware.**
+**Agent Authority turns a human-approved task into temporary execution authority, then keeps that authority bounded as the agent discovers resources, crosses tools, and performs side effects.**
 
-[Validate in 5 minutes](docs/validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Harness integration](docs/harness-integration.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Task Leases](docs/task-leases.md) · [Validate](docs/validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-> **Status: public pre-alpha / v0.3 validation milestone.** Core mission policy, receipts, local persistence, agent-instance authentication, one-time approvals, mutation idempotency, credential isolation, a protocol-neutral `guard.run()` API, harness action grants, GitHub brokered execution, and an MCP v2 policy gateway are implemented and covered by CI. Production OAuth onboarding, OS keychain backends, remote authenticated deployment, and additional provider adapters remain future work.
+> **Status: public pre-alpha / v0.4 validation candidate.** The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype with provenance-bound derived facts, approvals, revocation, idempotency, credential isolation, MCP v2 gateway, GitHub brokered execution, CI and CodeQL. It is not production-ready yet.
 
 </div>
 
-## What problem it solves
+## The problem
 
-Existing authentication answers questions such as **who is the user?**, **which application has a token?**, and **which provider scopes were granted?** Agent Authority adds a different decision immediately before an agent-originated side effect:
+AI agents increasingly receive broad provider permissions so they can complete narrow human tasks.
 
-> **Is this specific agent allowed to perform this specific action, on this specific resource, for this human-approved mission, right now?**
+A user says:
 
-The authority decision is independent of how the service was authenticated.
+> **Handle the demo request in this email thread.**
+
+The agent may need to:
 
 ```text
-Human / organization
-        |
-        | mission
-        v
-+----------------------------+
-|       Agent Authority      |
-| policy / approval / audit  |
-+-------------+--------------+
-              |
-      ALLOW / DENY / APPROVAL
-              |
-       existing execution path
-              |
-   SDK | MCP | OAuth | CLI | API
-              |
-              v
-         external service
+Gmail -> read one thread
+          |
+          v
+       discover sender
+          |
+          v
+Calendar -> create one meeting with that sender
+          |
+          v
+Gmail -> reply in the originating thread
 ```
 
-Agent Authority is **not another agent harness**, **not an OAuth replacement**, and **not an MCP product**. MCP is one integration transport around the same authority engine.
+The underlying OAuth connections may permit reading every email, creating meetings with anyone, or sending mail to anyone.
 
-## Validate in 5 minutes
+Traditional authorization answers:
+
+> Can this application use Calendar?
+
+Agent Authority asks a narrower question immediately before the side effect:
+
+> **Is this exact effect justified by the task the human authorized?**
+
+## Task-bounded autonomy
+
+Agent Authority is trying to make this trade-off unnecessary:
+
+```text
+broad standing permissions
+        OR
+approve every tool call
+```
+
+The target is:
+
+```text
+one meaningful task approval
+        |
+        v
+temporary bounded authority
+        |
+        +--> safe task actions proceed
+        +--> unrelated resources are blocked
+        +--> real authority expansion requires step-up
+        |
+        v
+task completes -> authority disappears
+```
+
+The provider credential may continue to exist. The **task authority does not**.
+
+## The key idea: authority can follow trusted task data
+
+Many resources do not exist in the original prompt. The agent discovers them while working.
+
+Agent Authority models this with a **Task Lease**:
+
+```text
+Human-approved task
+        |
+        v
+  authority root
+  Gmail thread #91
+        |
+ authorized read
+        |
+        v
+ derived fact
+ customer@example.com
+        |
+        v
+ exact binding
+ Calendar attendee must equal that sender
+```
+
+A request for `customer@example.com` can proceed.
+
+A request for `other@example.com` does not silently inherit the same authority. It becomes an **authority delta** and requires step-up.
+
+This is **derived authority**: authority follows a resource discovered through authorized execution, but never broadens into a standing wildcard permission.
+
+See [Task Leases and Derived Authority](docs/task-leases.md).
+
+## Core invariant
+
+```text
+Task Lease authority <= Mission authority
+```
+
+The mission remains the ceiling. A Task Lease may narrow an action to resources discovered during the task, but it cannot grant an action that the mission already denies or never allowed.
+
+More generally:
+
+> **Authority may stay the same or shrink as it moves through agents, tools and transports. It must never silently grow.**
+
+## Run the derived-authority demo
 
 Requirements: Node.js 20+.
 
@@ -53,229 +128,250 @@ git clone https://github.com/Null-Square/agent-authority.git
 cd agent-authority
 npm install
 npm test
+npm run demo:task-lease
 ```
 
-### Fastest protocol-neutral demo
+The demo performs this flow without provider credentials:
 
-The smallest integration wraps an existing side effect:
+```text
+1. ALLOW read of one task-authorized Gmail thread
+2. derive sender email from that same Task Lease receipt
+3. ALLOW Calendar event for that sender
+4. REQUIRE_APPROVAL for a different attendee
+5. complete task
+6. DENY subsequent actions
+```
+
+The side-effect callbacks for blocked actions never run.
+
+## Minimal developer API
 
 ```js
 import { AuthorityRuntime } from '@nullsquare/agent-authority';
-import { createAuthorityGuard } from '@nullsquare/agent-authority/guard';
+import { createTaskLease } from '@nullsquare/agent-authority/task-lease';
+import { createTaskLeaseGuard } from '@nullsquare/agent-authority/guard';
 
-const guard = createAuthorityGuard({ mission, runtime: new AuthorityRuntime() });
+const lease = createTaskLease({
+  mission,
+  request: 'Handle the demo request in thread:demo-91',
+  roots: [
+    { fact_id: 'fact:thread', kind: 'gmail.thread', value: 'thread:demo-91' }
+  ],
+  bindings: [
+    {
+      service: 'calendar',
+      action: 'event.create',
+      context_field: 'attendee',
+      fact_id: 'fact:sender-email'
+    }
+  ]
+});
 
-const { output, receipt } = await guard.run({
-  service: 'github',
-  action: 'repo.read',
-  context: { repository: 'Null-Square/agent-authority' }
-}, () => github.repos.get({ owner: 'Null-Square', repo: 'agent-authority' }));
+const guard = createTaskLeaseGuard({
+  lease,
+  runtime: new AuthorityRuntime()
+});
+
+const read = await guard.run({
+  service: 'gmail',
+  action: 'thread.read',
+  context: { thread: 'thread:demo-91' }
+}, () => gmail.readThread('thread:demo-91'));
+
+lease.derive({
+  fact_id: 'fact:sender-email',
+  kind: 'email.address',
+  value: read.output.sender,
+  from: ['fact:thread'],
+  receipt: read.receipt,
+  selector: 'output.sender'
+});
+
+await guard.run({
+  service: 'calendar',
+  action: 'event.create',
+  context: { attendee: read.output.sender }
+}, () => calendar.createEvent({ attendee: read.output.sender }));
 ```
 
-If the mission returns `DENY` or `REQUIRE_APPROVAL`, the callback is never invoked.
+The host keeps its existing SDK, connector and authentication. Agent Authority controls whether the effect may happen.
 
-Run the included public-data demo:
+## Three integration modes, one authority model
 
-```bash
-npm run demo:guard
-```
-
-Then prove resource scoping by requesting another repository:
-
-```bash
-npm run demo:guard -- someone/other-repo
-```
-
-The second command is blocked before its GitHub fetch callback executes.
-
-### MCP host demo
-
-The repository also includes a small validation MCP upstream and Agent Authority proxy:
-
-```bash
-agent-authority setup --principal user:local
-npm run demo:mcp-upstream
-```
-
-In another terminal:
-
-```bash
-agent-authority mcp proxy \
-  --upstream http://127.0.0.1:8791/mcp \
-  --mission examples/missions/web-validation.json \
-  --service mcp:validation
-```
-
-The official MCP v2 client integration test verifies that only the mission-authorized read-only tool can reach upstream. See [the complete validation guide](docs/validation.md).
-
-## Three integration modes
+Agent Authority is deliberately **not tied to MCP, OAuth, or one agent framework**.
 
 ### 1. In-process guard
 
-Best when an application already owns its SDK/API connection:
-
 ```text
-agent code -> guard.run() -> existing SDK
+agent code -> guard.run() -> existing SDK / API
 ```
 
-The host keeps its credential. Agent Authority controls whether the callback may execute.
+Best when the application already owns the provider connection. This is the primary v0.4 adoption path.
 
 ### 2. MCP gateway
 
-Best when a host already talks MCP:
-
 ```text
-ChatGPT / Claude / Codex / OpenClaw / IDE
-                 |
-                 v
-        Agent Authority MCP
-                 |
-                 v
-          existing MCP server
+MCP host -> Agent Authority -> existing MCP server
 ```
+
+Best when the harness already speaks MCP. MCP is an integration transport, not the product identity.
 
 ### 3. Brokered execution
 
-Best when the agent should not receive or own the provider credential:
-
 ```text
-agent -> Agent Authority -> encrypted credential broker -> provider
+agent -> Agent Authority -> isolated credential -> provider
 ```
 
-All three use the same mission evaluator and receipt model. See [Integration contract](docs/integration-contract.md).
+Best when the agent should not receive the provider credential at all.
 
-## Mission-scoped authority
+The long-term validation target is the **same Task Lease and authority lineage across all three paths**.
 
-```json
-{
-  "version": "0.1",
-  "mission_id": "mission:fix-agent-authority",
-  "principal": { "id": "user:local" },
-  "agent": { "id": "agent:codex:session-42", "harness": "codex" },
-  "objective": "Fix the approved issue in Agent Authority",
-  "resources": [
-    {
-      "service": "github",
-      "allow": ["repo.read", "repo.contents.read", "repo.contents.write", "pull_request.create"],
-      "deny": ["repo.delete", "billing.*"],
-      "constraints": {
-        "repository": ["Null-Square/agent-authority"]
-      }
-    }
-  ],
-  "constraints": {
-    "max_delegation_depth": 1,
-    "expires_at": "2026-08-21T22:00:00Z"
-  }
-}
-```
+## What is implemented
 
-Every sensitive request resolves to:
+### Task authority
 
-```text
-ALLOW
-DENY
-REQUIRE_APPROVAL
-```
-
-The important invariant is simple: **the side effect cannot occur before authority is granted, and the request evaluated must be the request executed.**
-
-## Connect once
-
-The first native brokered provider is GitHub. The current developer onboarding flow reads the token from stdin so it does not appear in shell history:
-
-```bash
-printf %s "$GITHUB_TOKEN" | agent-authority connect github --token-stdin
-agent-authority connections
-```
-
-The credential is encrypted in the local Agent Authority vault and is never returned to the model. Browser/device OAuth remains a future onboarding milestone.
-
-## Local authority home
-
-By default:
-
-```text
-~/.agent-authority/
-  config.json
-  missions/
-  state/
-    connections.json
-    revocations.json
-    usage.json
-    approvals.json
-    idempotency.json
-  vault/
-    master.key
-    agent-auth.key
-    secrets.enc.json
-  receipts/
-```
-
-Override with `AGENT_AUTHORITY_HOME` or `--home`.
-
-The encrypted-file vault is a local pre-alpha backend; OS keychain/KMS/HSM/enterprise vault backends are future production options.
-
-## Implemented now
-
-- mission validation and deterministic policy evaluation
+- mission validation and deterministic `ALLOW / DENY / REQUIRE_APPROVAL`
 - explicit deny precedence
-- wildcard action scopes
 - resource/context constraints
-- expiry and cumulative mission budgets
-- delegation depth and child-authority attenuation
+- expiry and cumulative budgets
+- delegation attenuation
 - durable mission revocation
-- action receipts and request hashes
-- agent-instance signed bearer tokens for the local sidecar
-- one-time approvals bound to the exact mission + request
-- mutation idempotency and conservative uncertain-state handling
-- protocol-neutral `guard.run()` enforcement for ordinary SDK/API calls
-- signed harness action grants bound to exact mission + request
-- MCP v2 read-only mission gateway and loopback proxy
+- Task Lease prototype
+- explicit authority roots
+- same-lease provenance-bound derived facts
+- required parent lineage and trusted extraction selector
+- exact context-field bindings
+- authority-delta step-up signal
+- immediate task completion/expiry enforcement
+- Task Lease IDs/hashes in decision receipts
+
+### Enforcement
+
+- protocol-neutral `guard.run()` wrapper
+- blocked side effects never invoke their callback
+- one-time human approvals bound to exact request
+- mutation idempotency
+- conservative uncertain-state handling
+- signed harness action grants
+- MCP v2 read-only gateway/proxy
+
+### Credentials and runtime
+
 - persistent connection metadata
 - AES-256-GCM local encrypted secret store
-- GitHub brokered execution without exposing its token to the agent
-- safe reconnect cleanup for replaced provider credentials
-- CLI: setup, doctor, status, connections, serve, connect/disconnect GitHub, mission validate/evaluate, approvals, agent tokens, MCP proxy
-- Node 20/22 CI, coverage, package checks, and CodeQL
+- safe reconnect cleanup
+- GitHub brokered execution without returning the token to the agent
+- short-lived signed local agent-instance tokens
+- local CLI/daemon
+
+### Engineering quality
+
+- adversarial authorization tests
+- Node 20 and Node 22 CI
+- coverage run
+- package checks
+- CodeQL
+
+## What is different from OAuth, IAM and MCP authorization?
+
+Agent Authority is **not trying to replace them**.
+
+OAuth/IAM answer who or what may access a provider and with which standing scopes. MCP authorization protects an MCP transport. Agent Authority operates at a different boundary:
+
+```text
+human task
+    |
+    v
+temporary task authority
+    |
+    v
+exact agent-originated effect
+    |
+    +--> existing OAuth / IAM / MCP / SDK / CLI
+```
+
+The project should consume existing identity/authentication mechanisms and emerging standards rather than invent another login or token format.
+
+The contribution we are testing is operational: **make task-scoped, provenance-aware least privilege usable inside ordinary agent stacks.**
+
+## Example use cases
+
+### Support / sales
+
+> Handle this customer request.
+
+Bind later actions to the customer, thread, ticket or meeting discovered from the authorized task path.
+
+### Finance
+
+> Refund the customer from this ticket, but never more than the original charge.
+
+Discover customer -> order -> charge through authorized reads, then bind the refund to those concrete facts and amount ceiling.
+
+### Coding / operations
+
+> Fix issue #42, open a PR, do not merge or deploy production.
+
+Keep repo/issue/branch authority bounded as subagents and tools change.
+
+### Personal / company operating agents
+
+> Handle this email.
+
+Allow a natural workflow across mail, calendar, CRM and internal systems without turning every connected account into ambient agent authority.
 
 ## Security principles
 
-1. Mission before credential.
-2. No side effect before an authority decision.
-3. The request evaluated must be the request executed.
-4. Deny wins.
-5. Authority may shrink during delegation, never expand.
-6. Resource constraints matter as much as provider scopes.
-7. Human approval is a policy outcome, not an afterthought.
-8. Mutation retries must not silently duplicate side effects.
-9. Revocation and budgets survive daemon restarts.
-10. Authentication protocols and transports remain replaceable adapters.
-11. Long-lived provider secrets must not enter model context through Agent Authority.
-12. Security gaps are documented rather than hidden.
+1. **Task before credential.** A provider token is not task authority.
+2. **Mission is the ceiling.** Task Leases cannot override explicit denies.
+3. **No side effect before authorization.** Denied and step-up actions never execute.
+4. **Authority lineage matters.** Derived facts require an authorized receipt from the same Task Lease, at least one existing parent fact, and a recorded extraction selector.
+5. **No silent resource expansion.** A different concrete resource becomes an authority delta.
+6. **Task authority ends with the task.** Completion and expiry are independent from provider credential lifetime.
+7. **Authority may shrink, never silently grow.** Delegation and transport changes must preserve non-amplification.
+8. **The evaluated request must be the executed request.** Request hashes, grants and idempotency protect the boundary.
+9. **Credentials stay out of model context where Agent Authority owns them.**
+10. **Security gaps are documented, not marketed away.**
 
 See [SECURITY.md](SECURITY.md).
 
-## What we are deliberately not building yet
+## Current limitations
 
-To keep the project useful and small, the current validation phase is **not** trying to become:
+This is still a validation implementation.
 
-- a new agent harness,
-- an OAuth replacement,
-- an MCP replacement,
-- a connector marketplace,
-- an enterprise dashboard,
-- a custom identity protocol.
+- Task Lease state is currently process-local.
+- Derived-value extraction is trusted to the host/adapter; v0.4 records the source receipt and selector but does not yet cryptographically prove extraction from the provider response.
+- Bindings currently target top-level request context fields.
+- Approved authority deltas are surfaced but not automatically applied back into a live lease.
+- GitHub token-stdin is a developer bridge, not final browser OAuth onboarding.
+- The encrypted local vault is not an OS keychain/KMS/HSM backend.
+- Remote authenticated deployment and a production approval UX are not complete.
 
-The project will expand only where real integrations show the authority boundary needs more capability.
+These are follow-on validation problems. We are intentionally not solving them with a giant policy language or another agent framework.
+
+## What we are deliberately not building
+
+- another agent harness
+- another OAuth or identity protocol
+- an MCP replacement
+- a connector marketplace
+- a giant proprietary policy DSL
+- an enterprise dashboard before the enforcement primitive proves adoption
 
 ## Contributing
 
-We want agent-framework authors, security engineers, OAuth/OIDC implementers, MCP maintainers, SDK/tool authors, cloud IAM specialists, and developers who can challenge the abstraction.
+The best contribution is not another abstract feature. It is a real integration or adversarial case that answers:
 
-The most valuable contributions right now are integrations that prove this invariant in another stack:
+> **Can this agent complete the intended task while being technically unable to use the same underlying account authority for an unrelated effect?**
 
-> An unauthorized agent-originated side effect cannot reach the provider, while an authorized one can, using the stack's existing authentication and execution machinery.
+We especially want:
+
+- framework integrations around `guard.run()`;
+- trustworthy operation -> resource-context mappings;
+- Task Lease examples from real workflows;
+- derived-authority / provenance attacks;
+- MCP and non-MCP conformance cases;
+- secure persistence and extraction-verification designs that stay simple.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -287,8 +383,8 @@ Apache-2.0.
 
 <div align="center">
 
-Built in public by **NullSquare** for the agentic internet.
+Built in public by **NullSquare**.
 
-**Agent Authority is a protocol-neutral policy enforcement layer for agent actions.**
+**Give your agent a task, not your account.**
 
 </div>

@@ -232,15 +232,15 @@ export class AuthorityRuntime {
 
   revoke(missionId, reason) { return this.revocations.revoke(missionId, reason); }
 
-  evaluate(missionInput, request) {
+  evaluate(missionInput, request, now = new Date()) {
     const mission = assertMission(missionInput);
     const revoked = this.revocations.get(mission.mission_id);
-    const result = revoked ? deny('mission_revoked', revoked.reason) : evaluateMissionPolicy(mission, request);
+    const result = revoked ? deny('mission_revoked', revoked.reason) : evaluateMissionPolicy(mission, request, now);
     return { result, receipt: createReceipt({ mission, request, result }) };
   }
 
-  async prepare(missionInput, request) {
-    const evaluation = this.evaluate(missionInput, request);
+  async prepare(missionInput, request, now = new Date()) {
+    const evaluation = this.evaluate(missionInput, request, now);
     if (evaluation.result.decision !== 'allow') return evaluation;
     const adapter = this.adapters.resolve(request.service);
     if (!adapter) return { ...evaluation, dispatch: null };

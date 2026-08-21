@@ -61,6 +61,17 @@ function authorizedReadReceipt(runtime, taskLease) {
   }).receipt;
 }
 
+function deriveSender(runtime, taskLease, value = 'customer@example.com') {
+  return taskLease.derive({
+    fact_id: 'fact:sender-email',
+    kind: 'email.address',
+    value,
+    from: ['fact:thread'],
+    receipt: authorizedReadReceipt(runtime, taskLease),
+    selector: 'output.sender.email'
+  });
+}
+
 test('bound action cannot run before the task establishes the required fact', async () => {
   const runtime = new AuthorityRuntime();
   const taskLease = lease();
@@ -94,7 +105,10 @@ test('authority can follow a fact derived from an authorized task read', async (
   });
 
   assert.equal(fact.provenance.type, 'derived');
+  assert.equal(fact.provenance.task_lease_id, taskLease.lease_id);
   assert.equal(fact.provenance.receipt_id, readReceipt.receipt_id);
+  assert.equal(fact.provenance.source_service, 'gmail');
+  assert.equal(fact.provenance.source_action, 'thread.read');
   assert.deepEqual(fact.provenance.from, ['fact:thread']);
 
   const guard = createTaskLeaseGuard({ lease: taskLease, runtime });
@@ -117,13 +131,7 @@ test('authority can follow a fact derived from an authorized task read', async (
 test('different resource becomes an authority delta and never executes automatically', async () => {
   const runtime = new AuthorityRuntime();
   const taskLease = lease();
-  taskLease.derive({
-    fact_id: 'fact:sender-email',
-    kind: 'email.address',
-    value: 'customer@example.com',
-    from: ['fact:thread'],
-    receipt: authorizedReadReceipt(runtime, taskLease)
-  });
+  deriveSender(runtime, taskLease);
 
   const guard = createTaskLeaseGuard({ lease: taskLease, runtime });
   let effects = 0;
@@ -160,7 +168,9 @@ test('derived authority cannot be created from a denied receipt', () => {
     () => taskLease.derive({
       fact_id: 'fact:sender-email',
       value: 'attacker@example.com',
-      receipt: denied
+      from: ['fact:thread'],
+      receipt: denied,
+      selector: 'output.sender.email'
     }),
     (error) => error.code === 'receipt_not_authorized'
   );
@@ -181,9 +191,55 @@ test('derived authority cannot use an allow receipt from another mission', () =>
     () => taskLease.derive({
       fact_id: 'fact:sender-email',
       value: 'customer@example.com',
-      receipt: foreignReceipt
+      from: ['fact:thread'],
+      receipt: foreignReceipt,
+      selector: 'output.sender.email'
     }),
     (error) => error.code === 'receipt_mission_mismatch'
+  );
+});
+
+test('derived authority cannot use an allow receipt from another task lease', () => {
+  const runtime = new AuthorityRuntime();
+  const firstLease = lease({ lease_id: 'lease:first' });
+  const secondLease = lease({ lease_id: 'lease:second' });
+  const foreignReceipt = authorizedReadReceipt(runtime, firstLease);
+
+  assert.throws(
+    () => secondLease.derive({
+      fact_id: 'fact:sender-email',
+      value: 'customer@example.com',
+      from: ['fact:thread'],
+      receipt: foreignReceipt,
+      selector: 'output.sender.email'
+    }),
+    (error) => error.code === 'receipt_lease_mismatch'
+  );
+});
+
+test('derived authority requires an explicit parent lineage and extraction selector', () => {
+  const runtime = new AuthorityRuntime();
+  const taskLease = lease();
+  const receipt = authorizedReadReceipt(runtime, taskLease);
+
+  assert.throws(
+    () => taskLease.derive({
+      fact_id: 'fact:no-parent',
+      value: 'customer@example.com',
+      receipt,
+      selector: 'output.sender.email'
+    }),
+    (error) => error.code === 'parent_fact_required'
+  );
+
+  assert.throws(
+    () => taskLease.derive({
+      fact_id: 'fact:no-selector',
+      value: 'customer@example.com',
+      from: ['fact:thread'],
+      receipt
+    }),
+    (error) => error.code === 'selector_required'
   );
 });
 

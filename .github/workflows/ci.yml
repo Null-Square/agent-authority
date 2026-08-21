@@ -39,6 +39,17 @@ jobs:
       - run: npm install --ignore-scripts
       - run: npm run test:coverage
 
+  framework-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --ignore-scripts
+      - name: Prove Agent Authority inside Vercel AI SDK ToolLoopAgent
+        run: npm run demo:vercel-ai
+
   live-github-validation:
     runs-on: ubuntu-latest
     steps:

@@ -12,7 +12,7 @@ The guarantee applies to effects that actually pass through the Agent Authority 
 
 ## Execution-bound derived authority
 
-The strict derived-authority path now binds provider-derived authority to the exact output returned by an authorized `guard.run()` effect.
+The strict derived-authority path binds provider-derived authority to the exact output returned by an authorized `guard.run()` effect.
 
 A successful guarded effect returns three relevant records:
 
@@ -55,6 +55,36 @@ The legacy `TaskLease.derive()` API remains for compatibility and records `deriv
 Execution evidence is an integrity mechanism inside the trusted host/runtime boundary. It proves that the value selected for strict derivation came from the exact output object bound to that Agent Authority receipt.
 
 It does **not** prove that Gmail, GitHub, or another provider cryptographically signed that output, and it does not protect a malicious host that bypasses or replaces the Agent Authority enforcement path. Stronger provider/transport attestation remains open M3 work.
+
+## Two-provider authority-extractor conformance
+
+The same strict primitive is now exercised by two independent provider mappings:
+
+```text
+Google Gmail
+thread.read
+   -> sender_email
+   -> reviewed extractor
+   -> email.address authority
+
+GitHub
+issue.list
+   -> selected_issue_number
+   -> reviewed extractor
+   -> github.issue.number authority
+```
+
+`test/provider-authority-conformance.test.js` applies the same contract to both mappings:
+
+- positive derivation gets its value from the evidence-bound output rather than caller input;
+- modifying the selected output under unchanged evidence is rejected;
+- evidence replay under another ALLOW receipt is rejected;
+- cross-Task-Lease receipt/evidence reuse is rejected;
+- an extractor rejects evidence from another operation.
+
+Provider-specific tests additionally verify canonical normalization and fail-closed extractor advertisement. The contract is documented in [Authority extractor conformance](authority-extractor-conformance.md).
+
+This is the current evidence that execution-bound derived authority is a reusable provider primitive rather than a Gmail-only special case.
 
 ## Cross-provider derived authority — Gmail → Calendar
 
@@ -158,13 +188,13 @@ Taken together, the deterministic Task Lease tests plus the controlled provider 
 
 See [Live Gmail → Calendar validation](live-google-validation.md).
 
-## Live derived-authority mutation — GitHub
+## Live evidence-derived mutation — GitHub
 
 Public fixture: [issue #9](https://github.com/Null-Square/agent-authority/issues/9)
 
 Validation workflow: CI job `live-derived-github-mutation`
 
-Passing run: [CI run 136](https://github.com/Null-Square/agent-authority/actions/runs/32517381668)
+Passing evidence-derived run: [CI run 262](https://github.com/Null-Square/agent-authority/actions/runs/32600963479)
 
 The job uses a GitHub Actions token with:
 
@@ -173,25 +203,40 @@ contents: read
 issues: write
 ```
 
-The Task Lease itself starts with only the repository as an authority root.
+The Task Lease begins with two explicit authority roots:
+
+```text
+repository = Null-Square/agent-authority
+fixture_marker = agent-authority-live-fixture-v1
+```
+
+Both values are bound to the `issue.list` request. The brokered GitHub provider adapter owns the external issue-list operation and normalizes the provider response. Issue bodies are used internally for marker matching but are not copied into the normalized authority output.
 
 ### Executed path
 
 ```text
-Task root
-Null-Square/agent-authority
+Task roots
+repository + fixture marker
         |
         v
-ALLOW live issue-list request
+ALLOW github:issue.list
+through reviewed provider adapter
+        |
+        +--> exact output-bound execution evidence
         |
         v
-discover issue #9 from GitHub response
+adapter selects exactly one marker match
+selected_issue_number = 9
         |
         v
-derive fact: issue_number = 9
+reviewed GitHub issue-number extractor
         |
         v
-ALLOW one real comment mutation on #9
+TaskLease.deriveFromEvidence()
+issue_number = 9
+        |
+        v
+ALLOW one real github:issue.comment on #9
         |
         +--> attempt comment on #1
         |      -> authority_delta_required
@@ -208,38 +253,41 @@ complete Task Lease
 The passing job recorded:
 
 ```text
-ALLOW -> discovered issue #9
-Derived authority -> issue #9
+ALLOW -> selected issue #9: Agent Authority live validation fixture — do not close
+Evidence-verified authority -> issue #9
 ALLOW -> real GitHub comment mutation executed
 STEP-UP -> unrelated issue #1 blocked before provider mutation
 DENY -> post-completion mutation blocked for issue #9
+PASS -> GitHub provider output became downstream authority only through execution evidence and a reviewed extractor
 Provider calls observed before cleanup: reads=1, task_mutations=1
 ```
 
-The temporary validation comment is deleted by test-harness cleanup after the proof. Cleanup is intentionally outside the agent authority path and counted separately.
+The temporary validation comment was deleted by harness cleanup after the proof. Cleanup remains intentionally outside the Task Lease authority path and is counted separately.
 
 ### What this proves
 
-- a concrete resource can be discovered from a real provider response during authorized execution;
-- that resource can become same-lease derived authority;
-- a real provider mutation can be limited to the derived resource;
-- asking for another resource does not silently inherit the same authority;
-- a blocked resource causes zero additional task-side provider mutation calls;
-- completing the Task Lease prevents reuse of the previously authorized resource;
-- the provider credential can still exist after task authority disappears.
+- the same execution-evidence + reviewed-extractor primitive used for Gmail works against a second real provider;
+- the brokered GitHub adapter, rather than arbitrary host extraction code, owns provider response normalization;
+- the caller does not provide the issue number to `deriveFromEvidence()`;
+- repository and discovery marker are explicit Task Lease roots;
+- a real provider mutation is limited to the issue selected from the authorized provider result;
+- another issue causes zero additional task-side provider mutation calls;
+- completing the Task Lease prevents reuse of the previously authorized issue;
+- the provider credential can remain valid after task authority disappears.
 
 ### What this does not prove
 
-- the current GitHub example has migrated to a reviewed evidence extractor contract;
+- GitHub cryptographically attests the normalized Agent Authority output;
+- source issue changes automatically invalidate a derived fact;
 - an agent cannot bypass Agent Authority if it independently possesses the provider credential or another unguarded provider path;
 - Task Lease state is durable across process failure;
 - the current prototype is ready for adversarial production use.
 
 ## Live provider read boundary — GitHub
 
-CI also runs `demo:live-github` against the public GitHub API.
+CI also runs `demo:live-github` against the GitHub API.
 
-It proves that one repository permitted by the Task Lease causes one live `fetch()` while another repository produces `authority_delta_required` before a second fetch occurs.
+It proves that one repository permitted by the Task Lease causes one live provider read while another repository produces `authority_delta_required` before a second provider request occurs.
 
 ## Network-boundary integration test
 
@@ -263,6 +311,7 @@ The test suite also covers:
 - parent lineage is required;
 - legacy host-trusted derivation records its extraction selector;
 - strict execution-evidence derivation rejects substitution/replay/tampering cases;
+- the shared provider conformance suite applies the same attacks to Google and GitHub mappings;
 - explicit mission deny rules remain the ceiling;
 - lease expiry and mission expiry are enforced against a consistent evaluation clock.
 
@@ -277,8 +326,8 @@ Current pull requests run:
 - package checks;
 - coverage;
 - live GitHub read validation;
-- live derived GitHub mutation validation for trusted in-repository branches;
-- Google provider, extractor, cross-provider and execution-evidence adversarial tests;
+- live evidence-derived GitHub mutation validation for trusted in-repository branches;
+- Google and GitHub provider/extractor conformance and execution-evidence adversarial tests;
 - CodeQL.
 
 The live Google provider mutation workflow is manual because it requires repository-owned Google OAuth secrets. It should be added to the public evidence list after its first successful run.

@@ -1,9 +1,11 @@
+import { CredentialBroker } from '../src/connections.js';
 import { AuthorityRuntime } from '../src/index.js';
 import {
   AuthorityApprovalRequiredError,
   AuthorityDeniedError,
   createTaskLeaseGuard
 } from '../src/guard.js';
+import { createGitHubProviderAdapter } from '../src/providers/github.js';
 import { createTaskLease } from '../src/task-lease.js';
 
 const repository = process.env.AA_VALIDATION_REPOSITORY || 'Null-Square/agent-authority';
@@ -43,6 +45,12 @@ const lease = createTaskLease({
       kind: 'github.repository',
       value: repository,
       source: 'validation-task'
+    },
+    {
+      fact_id: 'fact:fixture-marker',
+      kind: 'github.issue.marker',
+      value: marker,
+      source: 'validation-task'
     }
   ],
   bindings: [
@@ -51,6 +59,12 @@ const lease = createTaskLease({
       action: 'issue.list',
       context_field: 'repository',
       fact_id: 'fact:repository'
+    },
+    {
+      service: 'github',
+      action: 'issue.list',
+      context_field: 'fixture_marker',
+      fact_id: 'fact:fixture-marker'
     },
     {
       service: 'github',
@@ -68,10 +82,20 @@ const lease = createTaskLease({
 });
 
 const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
-const headers = {
+const broker = new CredentialBroker();
+broker.connect({
+  principal_id: mission.principal.id,
+  service: 'github',
+  auth_kind: 'github-actions-token',
+  credential: { access_token: token },
+  scopes: ['contents:read', 'issues:write']
+});
+const adapter = createGitHubProviderAdapter({ broker });
+
+const cleanupHeaders = {
   accept: 'application/vnd.github+json',
   authorization: `Bearer ${token}`,
-  'user-agent': 'agent-authority-derived-mutation-validation',
+  'user-agent': 'agent-authority-derived-mutation-validation-cleanup',
   'x-github-api-version': '2022-11-28'
 };
 
@@ -80,90 +104,83 @@ let providerMutationCalls = 0;
 let cleanupCalls = 0;
 let createdCommentId = null;
 
-async function githubJson(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: { ...headers, ...(options.headers || {}) }
-  });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`GitHub ${response.status}: ${body.slice(0, 300)}`);
-  }
-  if (response.status === 204) return null;
-  return response.json();
+function discoveryRequest() {
+  return {
+    service: 'github',
+    action: 'issue.list',
+    context: {
+      repository,
+      fixture_marker: marker,
+      state: 'open',
+      per_page: 100
+    }
+  };
 }
 
 async function discoverFixtureIssue() {
-  return guard.run(
-    {
-      service: 'github',
-      action: 'issue.list',
-      context: { repository }
-    },
-    async () => {
-      providerReadCalls += 1;
-      const issues = await githubJson(
-        `https://api.github.com/repos/${owner}/${repo}/issues?state=open&per_page=100`
-      );
-      const fixture = issues.find((issue) => !issue.pull_request && issue.body?.includes(marker));
-      if (!fixture) throw new Error(`validation fixture with marker ${marker} was not found`);
-      return { number: fixture.number, title: fixture.title };
-    }
-  );
+  const request = discoveryRequest();
+  return guard.run(request, async () => {
+    providerReadCalls += 1;
+    return adapter.execute({ mission, request });
+  });
 }
 
 async function commentOnIssue(issueNumber, body) {
-  return guard.run(
-    {
-      service: 'github',
-      action: 'issue.comment',
-      context: { repository, issue_number: issueNumber }
-    },
-    async () => {
-      providerMutationCalls += 1;
-      const comment = await githubJson(
-        `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ body })
-        }
-      );
-      return { id: comment.id, html_url: comment.html_url };
-    }
-  );
+  const request = {
+    service: 'github',
+    action: 'issue.comment',
+    context: { repository, issue_number: issueNumber, body }
+  };
+
+  return guard.run(request, async () => {
+    providerMutationCalls += 1;
+    return adapter.execute({ mission, request });
+  });
 }
 
 async function cleanupComment(commentId) {
   cleanupCalls += 1;
-  await githubJson(
+  const response = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/issues/comments/${commentId}`,
-    { method: 'DELETE' }
+    { method: 'DELETE', headers: cleanupHeaders }
   );
+  if (!response.ok && response.status !== 404) {
+    const body = await response.text();
+    throw new Error(`GitHub cleanup ${response.status}: ${body.slice(0, 300)}`);
+  }
 }
 
 try {
   console.log(`Task root repository: ${repository}`);
-  console.log('1. Discover fixture through an authorized live GitHub issue-list call');
+  console.log(`Task root fixture marker: ${marker}`);
+  console.log('1. Discover fixture through the reviewed GitHub provider adapter');
   const discovered = await discoverFixtureIssue();
-  console.log(`   ALLOW -> discovered issue #${discovered.output.number}: ${discovered.output.title}`);
 
-  lease.derive({
+  if (discovered.output.selected_issue_match_count !== 1) {
+    throw new Error(`expected exactly one fixture marker match, got ${discovered.output.selected_issue_match_count}`);
+  }
+  console.log(`   ALLOW -> selected issue #${discovered.output.selected_issue_number}: ${discovered.output.selected_issue_title}`);
+
+  const extractor = adapter.authorityExtractor(discoveryRequest(), 'github.issue.number');
+  if (!extractor) throw new Error('GitHub provider did not advertise the issue-number authority extractor');
+
+  const issueFact = lease.deriveFromEvidence({
     fact_id: 'fact:discovered-issue-number',
     kind: 'github.issue.number',
-    value: discovered.output.number,
-    from: ['fact:repository'],
+    from: ['fact:repository', 'fact:fixture-marker'],
     receipt: discovered.receipt,
-    selector: 'output.number'
+    evidence: discovered.evidence,
+    output: discovered.output,
+    extractor
   });
-  console.log(`2. Derived authority -> issue #${discovered.output.number}`);
+  console.log(`2. Evidence-verified authority -> issue #${issueFact.value}`);
 
-  const validationBody = `Agent Authority live derived-authority validation (${new Date().toISOString()}). Temporary comment; CI removes it after the proof.`;
-  const allowedMutation = await commentOnIssue(discovered.output.number, validationBody);
-  createdCommentId = allowedMutation.output.id;
+  const validationBody = `Agent Authority live evidence-derived authorization validation (${new Date().toISOString()}). Temporary comment; CI removes it after the proof.`;
+  const allowedMutation = await commentOnIssue(issueFact.value, validationBody);
+  createdCommentId = allowedMutation.output.comment_id;
   console.log(`3. ALLOW -> real GitHub comment mutation executed (comment ${createdCommentId})`);
 
-  const unrelatedIssue = discovered.output.number === 1 ? 2 : 1;
+  const unrelatedIssue = issueFact.value === 1 ? 2 : 1;
   try {
     await commentOnIssue(unrelatedIssue, 'THIS MUST NEVER REACH GITHUB');
     throw new Error('unrelated issue mutation unexpectedly executed');
@@ -178,15 +195,15 @@ try {
     throw new Error(`expected exactly one task-side provider mutation before completion, got ${providerMutationCalls}`);
   }
 
-  lease.complete('live derived-mutation validation complete');
+  lease.complete('live evidence-derived mutation validation complete');
   try {
-    await commentOnIssue(discovered.output.number, 'THIS MUST NOT RUN AFTER TASK COMPLETION');
+    await commentOnIssue(issueFact.value, 'THIS MUST NOT RUN AFTER TASK COMPLETION');
     throw new Error('post-completion mutation unexpectedly executed');
   } catch (error) {
     if (!(error instanceof AuthorityDeniedError) || error.code !== 'task_lease_completed') {
       throw error;
     }
-    console.log(`5. DENY -> post-completion mutation blocked for issue #${discovered.output.number}`);
+    console.log(`5. DENY -> post-completion mutation blocked for issue #${issueFact.value}`);
   }
 
   if (providerReadCalls !== 1) {
@@ -196,7 +213,7 @@ try {
     throw new Error(`expected exactly one provider mutation after blocked attempts, got ${providerMutationCalls}`);
   }
 
-  console.log('PASS -> dynamic resource was discovered from GitHub, derived into the Task Lease, and mutated exactly once');
+  console.log('PASS -> GitHub provider output became downstream authority only through execution evidence and a reviewed extractor');
   console.log('PASS -> unrelated and post-completion mutations produced zero additional provider mutation calls');
 } finally {
   if (createdCommentId) {

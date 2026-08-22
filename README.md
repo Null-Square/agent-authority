@@ -1,6 +1,6 @@
 <div align="center">
 
-![Agent Authority](docs/assets/agent-authority-cover.svg)
+![Agent Authority](docs/assets/agent-authority-cover-editorial-v2.png)
 
 # Agent Authority
 

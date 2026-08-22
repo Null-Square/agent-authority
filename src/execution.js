@@ -1,4 +1,5 @@
 import { AuthorityRuntime, createReceipt } from './index.js';
+import { createExecutionEvidence } from './authority-evidence.js';
 
 function executionFailure(mission, request, code, reason, extra = {}) {
   const result = { decision: 'deny', code, reason, ...extra };
@@ -115,9 +116,38 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
     }
   }
 
-  async execute(missionInput, request) {
-    let evaluation = this.evaluate(missionInput, request);
+  /**
+   * Execute through the broker while preserving Task Lease narrowing.
+   *
+   * A lease-level REQUIRE_APPROVAL is returned before adapter readiness or
+   * provider execution. It is not converted into a mission-level one-time
+   * approval because applying an authority delta back into a live lease is a
+   * separate, not-yet-implemented capability.
+   */
+  async executeTaskLease(lease, request) {
+    if (!lease || typeof lease.evaluate !== 'function' || !lease.mission) {
+      throw new Error('task lease with mission and evaluate() is required');
+    }
+    return this.execute(lease.mission, request, { lease });
+  }
+
+  async execute(missionInput, request, { lease = null } = {}) {
+    if (lease && lease.mission?.mission_id !== missionInput?.mission_id) {
+      throw new Error('task lease mission does not match execution mission');
+    }
+
+    let evaluation = lease
+      ? lease.evaluate(this, request)
+      : this.evaluate(missionInput, request);
+
     if (evaluation.result.decision === 'deny') return { ...evaluation, output: null };
+
+    // A Task Lease is the narrowest authority object. Do not let brokered
+    // execution reinterpret a lease-level authority delta as a broader mission
+    // approval. This keeps broker behavior aligned with guard.run() and MCP.
+    if (lease && evaluation.result.decision !== 'allow') {
+      return { ...evaluation, output: null };
+    }
 
     const adapter = this.adapters.resolve(request.service);
     if (!adapter) {
@@ -148,6 +178,7 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
 
     try {
       const output = await adapter.execute({ mission: missionInput, request });
+      const evidence = createExecutionEvidence({ receipt: evaluation.receipt, output });
       let usage = null;
       if (budgetCheck && !budgetCheck.result) {
         const spent = this.usage.record(missionInput.mission_id, budgetCheck.currency, budgetCheck.amount);
@@ -160,7 +191,7 @@ export class ExecutingAuthorityRuntime extends AuthorityRuntime {
       if (executionRecord && this.executions) {
         this.executions.complete({ mission: missionInput, request, receipt_id: evaluation.receipt?.receipt_id || null });
       }
-      return { ...evaluation, output, usage, execution: executionRecord || null };
+      return { ...evaluation, output, evidence, usage, execution: executionRecord || null };
     } catch (error) {
       if (executionRecord && this.executions) {
         this.executions.uncertain({ mission: missionInput, request, error_code: error.code || 'provider_error' });

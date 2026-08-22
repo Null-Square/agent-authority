@@ -31,6 +31,15 @@ export function isDeclaredReadOnlyTool(tool) {
   return tool?.annotations?.readOnlyHint === true;
 }
 
+function authorityMeta(evaluation = {}) {
+  return {
+    'io.nullsquare.agent-authority/decision': evaluation.result?.decision || 'deny',
+    'io.nullsquare.agent-authority/code': evaluation.result?.code || null,
+    'io.nullsquare.agent-authority/receipt_hash': evaluation.receipt?.receipt_hash || null,
+    'io.nullsquare.agent-authority/task_lease_id': evaluation.receipt?.task_lease_id || null
+  };
+}
+
 function deniedToolResult(result, extra = {}) {
   return {
     content: [{
@@ -47,38 +56,55 @@ function deniedToolResult(result, extra = {}) {
 }
 
 /**
- * Small, transport-neutral policy gateway for MCP tools.
+ * Small policy gateway for MCP tools.
  *
  * The upstream object only needs two methods:
  *   listTools(params?) -> { tools: [...] }
  *   callTool(params)   -> MCP CallToolResult
  *
- * v0.1 deliberately defaults to read-only enforcement. A tool is considered
+ * The gateway accepts either a Mission or a Task Lease. When a Task Lease is
+ * supplied, every MCP tool call is evaluated through that exact lease before
+ * the upstream callback can run. This keeps transport changes from bypassing
+ * task-level narrowing.
+ *
+ * The gateway still defaults to read-only enforcement. A tool is considered
  * read-only only when its MCP annotations explicitly set readOnlyHint=true.
- * Write support belongs behind the existing approval + idempotency runtime and
- * is intentionally not inferred from tool names.
+ * Write support must be enabled deliberately; it is never inferred from names.
  */
 export class MissionMcpGateway {
   constructor({
     mission,
+    lease,
     runtime,
     upstream,
     service = 'mcp:upstream',
     readOnly = true,
     contextMapper = contextFromToolArguments
   } = {}) {
-    if (!mission) throw new Error('mission is required');
+    if ((mission && lease) || (!mission && !lease)) {
+      throw new Error('provide exactly one of mission or lease');
+    }
+    if (lease && (typeof lease.evaluate !== 'function' || !lease.mission)) {
+      throw new Error('lease must provide mission and evaluate(runtime, request)');
+    }
     if (!runtime || typeof runtime.evaluate !== 'function') throw new Error('authority runtime is required');
     if (!upstream || typeof upstream.listTools !== 'function' || typeof upstream.callTool !== 'function') {
       throw new Error('upstream MCP client must implement listTools() and callTool()');
     }
-    this.mission = mission;
+    this.mission = mission || lease.mission;
+    this.lease = lease || null;
     this.runtime = runtime;
     this.upstream = upstream;
     this.service = service;
     this.readOnly = readOnly;
     this.contextMapper = contextMapper;
     this.tools = new Map();
+  }
+
+  evaluate(request) {
+    return this.lease
+      ? this.lease.evaluate(this.runtime, request)
+      : this.runtime.evaluate(this.mission, request);
   }
 
   async refreshTools(params = undefined) {
@@ -122,11 +148,9 @@ export class MissionMcpGateway {
       action: mcpToolAction(toolName),
       context
     };
-    const evaluation = this.runtime.evaluate(this.mission, request);
+    const evaluation = this.evaluate(request);
     if (evaluation.result.decision !== 'allow') {
-      return deniedToolResult(evaluation.result, {
-        'io.nullsquare.agent-authority/receipt_hash': evaluation.receipt?.receipt_hash || null
-      });
+      return deniedToolResult(evaluation.result, authorityMeta(evaluation));
     }
 
     const output = await this.upstream.callTool(params);
@@ -134,8 +158,7 @@ export class MissionMcpGateway {
       ...output,
       _meta: {
         ...(output?._meta || {}),
-        'io.nullsquare.agent-authority/decision': 'allow',
-        'io.nullsquare.agent-authority/receipt_hash': evaluation.receipt?.receipt_hash || null
+        ...authorityMeta(evaluation)
       }
     };
   }

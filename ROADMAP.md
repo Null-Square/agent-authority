@@ -77,7 +77,7 @@ Build only what the real M1 workflow proves necessary.
 
 **Success criterion:** a Task Lease survives daemon/process restarts without gaining authority or losing its provenance lineage.
 
-## M3 — Trustworthy derived facts — first slice in progress
+## M3 — Trustworthy derived facts — two-provider proof established
 
 The first real Gmail -> Calendar integration showed that recording a host-supplied value plus selector was too weak for the strongest derived-authority claim. The compatibility `derive()` path remains host-trusted; new provider work should prefer execution-bound evidence and reviewed adapter extractors.
 
@@ -85,14 +85,17 @@ The first real Gmail -> Calendar integration showed that recording a host-suppli
 - [x] bind successful guarded outputs to the exact ALLOW receipt, request and output hash
 - [x] add `TaskLease.deriveFromEvidence()` so the caller cannot provide the authority value
 - [x] migrate Gmail sender -> Calendar attendee derivation to the evidence-verified path
+- [x] migrate the real GitHub issue discovery -> comment mutation proof to the same evidence-verified path
 - [x] adversarial tests for value substitution, output/evidence tampering, receipt replay, cross-lease reuse, wrong-operation extraction and dangerous selectors
+- [x] shared conformance fixtures for reviewed operation -> authority-field mappings across Google and GitHub
 - [ ] define provider/result attestation stronger than a trusted host output hash where practical
-- [ ] conformance fixtures for reviewed operation -> authority-field mappings across multiple providers
 - [ ] define freshness/invalidation rules when a source resource changes
+
+The shared contract is documented in `docs/authority-extractor-conformance.md`. Google and GitHub now use the same `guard.run()` -> execution evidence -> reviewed extractor -> `deriveFromEvidence()` primitive, and the same conformance suite attacks both mappings.
 
 Do **not** build a general semantic policy language unless real integrations require it.
 
-**Success criterion:** provider-derived authority cannot be established through the strict path unless the exact guarded output, ALLOW receipt and reviewed extractor contract agree on the selected value. Stronger provider attestation and source invalidation remain separate follow-on problems.
+**Success criterion:** provider-derived authority cannot be established through the strict path unless the exact guarded output, ALLOW receipt and reviewed extractor contract agree on the selected value. This behavior is now exercised across two provider mappings. Stronger provider attestation and source invalidation remain separate follow-on problems.
 
 ## M4 — Same task, multiple transports
 

@@ -10,9 +10,55 @@ This page records the strongest properties the repository currently demonstrates
 
 The guarantee applies to effects that actually pass through the Agent Authority enforcement boundary. A separate unguarded provider path is outside this guarantee.
 
+## Execution-bound derived authority
+
+The strict derived-authority path now binds provider-derived authority to the exact output returned by an authorized `guard.run()` effect.
+
+A successful guarded effect returns three relevant records:
+
+```text
+ALLOW receipt
+    +
+exact effect output
+    |
+    v
+execution evidence
+(receipt + request + output hash)
+    |
+    v
+reviewed adapter extractor
+(selector only, no value)
+    |
+    v
+TaskLease.deriveFromEvidence()
+    |
+    v
+derived authority fact
+```
+
+`deriveFromEvidence()` does not accept the derived authority value. The trusted adapter extractor chooses a reviewed selector, and Task Lease resolves that selector itself only after verifying the execution evidence.
+
+`test/authority-evidence.test.js` attacks this boundary directly and proves that:
+
+- caller-supplied value substitution does not control the resulting fact;
+- modified provider output is rejected with `evidence_output_mismatch`;
+- modified execution-evidence contents are rejected;
+- evidence cannot be replayed under a second ALLOW receipt;
+- a receipt/evidence chain from another Task Lease is rejected;
+- the Gmail sender extractor rejects the wrong provider operation;
+- dangerous selector paths such as `__proto__` fail closed.
+
+The legacy `TaskLease.derive()` API remains for compatibility and records `derivation_mode: host-trusted`. New provider-derived authority should prefer `deriveFromEvidence()`, which records `derivation_mode: execution-evidence-v1`, extractor ID, source output hash, and execution-evidence hash.
+
+### Boundary of this claim
+
+Execution evidence is an integrity mechanism inside the trusted host/runtime boundary. It proves that the value selected for strict derivation came from the exact output object bound to that Agent Authority receipt.
+
+It does **not** prove that Gmail, GitHub, or another provider cryptographically signed that output, and it does not protect a malicious host that bypasses or replaces the Agent Authority enforcement path. Stronger provider/transport attestation remains open M3 work.
+
 ## Cross-provider derived authority — Gmail → Calendar
 
-Agent Authority now includes a real Google provider mapping, an adversarial cross-provider test, a live validation script, and an opt-in GitHub Actions workflow.
+Agent Authority includes a real Google provider mapping, an adversarial cross-provider test, a live validation script, and an opt-in GitHub Actions workflow.
 
 The task shape is:
 
@@ -23,8 +69,10 @@ one Gmail thread
         v
 ALLOW Gmail thread.read
         |
+        +--> output-bound execution evidence
+        |
         v
-discover sender email
+trusted Gmail sender extractor
         |
         v
 derive fact: sender_email
@@ -57,19 +105,21 @@ A controlled self-test was exercised against the connected NullSquare Gmail and 
 
 No unrelated external person was invited. The smoke test establishes that the concrete Gmail and Calendar operations used by the validation are available and compatible with the intended data shape.
 
-The live connected-account smoke is not presented as a public CI proof of the repository script. The Task Lease zero-call assertions are separately executable in `test/google-cross-provider.test.js`, and `.github/workflows/live-google-validation.yml` is provided for a rerunnable provider-backed proof once repository Google OAuth secrets are configured.
+The live connected-account smoke is not presented as a public CI proof of the repository script. The Task Lease zero-call and execution-evidence assertions are separately executable in `test/google-cross-provider.test.js` and `test/authority-evidence.test.js`, and `.github/workflows/live-google-validation.yml` is provided for a rerunnable provider-backed proof once repository Google OAuth secrets are configured.
 
 ### Executable local/CI assertions
 
 `test/google-cross-provider.test.js` proves deterministically that:
 
 - the approved Gmail thread callback runs exactly once;
-- its sender becomes a same-lease derived authority fact;
+- its sender becomes a same-lease `execution-evidence-v1` authority fact;
 - one Calendar mutation for that sender runs exactly once;
 - a different attendee produces `authority_delta_required` and the Calendar callback is not invoked;
 - after lease completion, the previously valid attendee produces `task_lease_completed` and the Calendar callback is not invoked again.
 
-`test/google-provider.test.js` separately validates the Google REST mappings, metadata-only Gmail sender extraction, Calendar attendee body, default `sendUpdates=none`, credential redaction, unsupported-action failure, and mutation classification.
+`test/google-provider.test.js` validates the Google REST mappings, metadata-only Gmail sender extraction, Calendar attendee body, default `sendUpdates=none`, credential redaction, unsupported-action failure, and mutation classification.
+
+`test/google-authority-extractor.test.js` separately verifies that the reviewed Gmail extractor only accepts canonical `gmail:thread.read` sender output and that the Google adapter advertises it only for the supported authority mapping.
 
 ### Public workflow
 
@@ -89,9 +139,10 @@ The connected GitHub tool does not expose repository Actions-secret management, 
 
 ### What this proves
 
-Taken together, the deterministic Task Lease test plus the controlled provider smoke show that:
+Taken together, the deterministic Task Lease tests plus the controlled provider smoke show that:
 
 - the Gmail → Calendar derived-authority shape is implemented, not just diagrammed;
+- strict derivation binds the sender to the exact guarded Gmail output before it becomes authority;
 - the exact attendee binding is enforced before the Calendar mutation callback;
 - provider operations exist and work against real Gmail and Calendar accounts;
 - cleanup can keep the live proof reversible and self-contained.
@@ -99,9 +150,10 @@ Taken together, the deterministic Task Lease test plus the controlled provider s
 ### What this does not prove yet
 
 - a public GitHub Actions run has executed the full repository live script;
-- host-side extraction of `sender_email` is cryptographically attested by Gmail;
+- `sender_email` is cryptographically attested by Gmail rather than integrity-bound to the trusted host's guarded output;
 - the agent cannot bypass Agent Authority if it independently holds a Google credential;
 - Task Lease state is durable across process failure;
+- source-data changes automatically invalidate downstream facts;
 - the refresh-token setup is production credential onboarding.
 
 See [Live Gmail → Calendar validation](live-google-validation.md).
@@ -178,7 +230,7 @@ The temporary validation comment is deleted by test-harness cleanup after the pr
 
 ### What this does not prove
 
-- the host/adapter's extraction of `output.number` is cryptographically verified;
+- the current GitHub example has migrated to a reviewed evidence extractor contract;
 - an agent cannot bypass Agent Authority if it independently possesses the provider credential or another unguarded provider path;
 - Task Lease state is durable across process failure;
 - the current prototype is ready for adversarial production use.
@@ -209,7 +261,8 @@ The test suite also covers:
 - receipts from another mission are rejected;
 - receipts from another Task Lease are rejected;
 - parent lineage is required;
-- a trusted extraction selector must be recorded;
+- legacy host-trusted derivation records its extraction selector;
+- strict execution-evidence derivation rejects substitution/replay/tampering cases;
 - explicit mission deny rules remain the ceiling;
 - lease expiry and mission expiry are enforced against a consistent evaluation clock.
 
@@ -225,7 +278,7 @@ Current pull requests run:
 - coverage;
 - live GitHub read validation;
 - live derived GitHub mutation validation for trusted in-repository branches;
-- Google provider and cross-provider adversarial tests;
+- Google provider, extractor, cross-provider and execution-evidence adversarial tests;
 - CodeQL.
 
 The live Google provider mutation workflow is manual because it requires repository-owned Google OAuth secrets. It should be added to the public evidence list after its first successful run.

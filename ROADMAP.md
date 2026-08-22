@@ -55,9 +55,14 @@ never silently grow
 - [x] independent task-lease expiry
 - [x] task-lease ID/hash in receipts
 - [x] self-contained cross-system demo: Gmail-thread fact -> Calendar attendee
-- [ ] exercise the same pattern against two real provider operations
+- [x] reusable Google REST adapter for Gmail thread reads and Calendar event mutations
+- [x] adversarial Gmail -> Calendar test proving unrelated and post-completion effects never invoke provider callbacks
+- [x] real connected-account smoke: Gmail self-test fixture -> exact attendee -> temporary Calendar event -> cleanup
+- [ ] rerun the same proof as a public GitHub Actions job after repository Google OAuth secrets are configured
 
 **Success criterion:** a real multi-step agent workflow discovers a resource during an authorized read and can use exactly that resource in a later side effect, while an unrelated resource is technically blocked without requiring approval for every normal task step.
+
+The core cross-provider behavior is now implemented and exercised against connected Gmail and Calendar accounts. Public Actions reproducibility remains the final M1 evidence gate because GitHub cannot reuse an interactive ChatGPT connector credential; the manual workflow is committed and expects a refresh token stored only as repository secrets.
 
 ## M2 — Durable task execution
 

@@ -30,6 +30,7 @@ function sendJson(res, status, value) {
  */
 export function createMcpProxyServer({
   mission,
+  lease,
   runtime,
   upstream,
   upstreamUrl,
@@ -43,6 +44,7 @@ export function createMcpProxyServer({
 
   const gateway = createMcpGatewayHandler({
     mission,
+    lease,
     runtime,
     upstream,
     upstreamUrl,
@@ -64,6 +66,7 @@ export function createMcpProxyServer({
           ok: true,
           service: 'agent-authority-mcp-gateway',
           mode: 'read-only',
+          authority: lease ? 'task-lease' : 'mission',
           upstream: upstreamUrl || 'injected'
         });
       }

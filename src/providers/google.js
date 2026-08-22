@@ -58,8 +58,9 @@ export function gmailThreadSenderAuthorityExtractor({ receipt, output } = {}) {
     );
   }
 
-  const normalized = extractEmailAddress(output?.sender_email);
-  if (!normalized || normalized !== String(output.sender_email).trim().toLowerCase()) {
+  const raw = typeof output?.sender_email === 'string' ? output.sender_email.trim() : '';
+  const normalized = extractEmailAddress(raw);
+  if (!normalized || normalized !== raw) {
     throw providerError(
       'trusted_extractor_output_invalid',
       'normalized Gmail output does not contain a canonical sender_email'

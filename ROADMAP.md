@@ -117,7 +117,7 @@ Only after the task-bound enforcement model is validated.
 - [ ] framework integration examples
 - [ ] `good first issue` tasks based on real mappings/tests
 - [ ] independent contributor implementation of one adapter
-- [ ] release packaging and npm publication
+- [x] release packaging and npm publication
 - [ ] documentation site only when README/docs become too large
 
 ## M7 — Standards interoperability

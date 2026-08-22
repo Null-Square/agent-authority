@@ -10,7 +10,7 @@
 
 [Task Leases](docs/task-leases.md) · [Validate](docs/validation.md) · [Google proof](docs/live-google-validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-> **Status: public pre-alpha / v0.4.1 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype with provenance-bound derived facts, approvals, revocation, idempotency, credential isolation, MCP v2 gateway, GitHub and Google provider integrations, CI and CodeQL. It is not production-ready yet.
+> **Status: public pre-alpha / v0.4.2 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype, execution-bound derived facts, approvals, revocation, idempotency, credential isolation, MCP v2 gateway, GitHub and Google provider integrations, CI and CodeQL. It is not production-ready yet.
 
 </div>
 
@@ -98,6 +98,12 @@ Human-approved task
         |
  authorized read
         |
+        +--> ALLOW receipt
+        +--> exact output hash evidence
+        |
+        v
+ reviewed adapter extractor
+        |
         v
  derived fact
  customer@example.com
@@ -152,7 +158,7 @@ The demo performs this flow without provider credentials:
 
 The side-effect callbacks for blocked actions never run.
 
-The repository also includes a real Gmail → Calendar validation path and a reusable Google provider adapter. See [Live Gmail → Calendar validation](docs/live-google-validation.md).
+The repository also includes a real Gmail → Calendar validation path and a reusable Google provider adapter. The stricter v0.4.2 path binds the derived sender to the exact guarded output before it becomes authority. See [Live Gmail → Calendar validation](docs/live-google-validation.md) and [Executable Evidence](docs/evidence.md).
 
 ## Minimal developer API
 
@@ -160,6 +166,7 @@ The repository also includes a real Gmail → Calendar validation path and a reu
 import { AuthorityRuntime } from '@nullsquare/agent-authority';
 import { createTaskLease } from '@nullsquare/agent-authority/task-lease';
 import { createTaskLeaseGuard } from '@nullsquare/agent-authority/guard';
+import { gmailThreadSenderAuthorityExtractor } from '@nullsquare/agent-authority/providers/google';
 
 const lease = createTaskLease({
   mission,
@@ -171,7 +178,7 @@ const lease = createTaskLease({
     {
       service: 'calendar',
       action: 'event.create',
-      context_field: 'attendee',
+      context_field: 'attendee_email',
       fact_id: 'fact:sender-email'
     }
   ]
@@ -185,24 +192,29 @@ const guard = createTaskLeaseGuard({
 const read = await guard.run({
   service: 'gmail',
   action: 'thread.read',
-  context: { thread: 'thread:demo-91' }
+  context: { thread_id: 'thread:demo-91' }
 }, () => gmail.readThread('thread:demo-91'));
 
-lease.derive({
+const senderFact = lease.deriveFromEvidence({
   fact_id: 'fact:sender-email',
   kind: 'email.address',
-  value: read.output.sender,
   from: ['fact:thread'],
   receipt: read.receipt,
-  selector: 'output.sender'
+  evidence: read.evidence,
+  output: read.output,
+  extractor: gmailThreadSenderAuthorityExtractor
 });
 
 await guard.run({
   service: 'calendar',
   action: 'event.create',
-  context: { attendee: read.output.sender }
-}, () => calendar.createEvent({ attendee: read.output.sender }));
+  context: { attendee_email: senderFact.value }
+}, () => calendar.createEvent({ attendee: senderFact.value }));
 ```
+
+`deriveFromEvidence()` does not accept the authority value. The reviewed extractor selects a normalized output field, and Task Lease resolves that value only after verifying that the output still matches the exact allowed execution evidence.
+
+The older `derive()` API remains available as the explicitly **host-trusted compatibility path**.
 
 The host keeps its existing SDK, connector and authentication. Agent Authority controls whether the effect may happen.
 
@@ -249,7 +261,11 @@ The long-term validation target is the **same Task Lease and authority lineage a
 - Task Lease prototype
 - explicit authority roots
 - same-lease provenance-bound derived facts
-- required parent lineage and trusted extraction selector
+- execution evidence binding an allowed receipt, request and exact output hash
+- strict `deriveFromEvidence()` path where the caller cannot provide the authority value
+- reviewed Gmail sender authority extractor bound to `gmail:thread.read`
+- legacy host-trusted `derive()` compatibility path
+- required parent lineage and extraction selector
 - exact context-field bindings
 - authority-delta step-up signal
 - immediate task completion/expiry enforcement
@@ -259,6 +275,7 @@ The long-term validation target is the **same Task Lease and authority lineage a
 
 - protocol-neutral `guard.run()` wrapper
 - blocked side effects never invoke their callback
+- successful guarded effects return separate execution evidence
 - one-time human approvals bound to exact request
 - mutation idempotency
 - conservative uncertain-state handling
@@ -278,10 +295,12 @@ The long-term validation target is the **same Task Lease and authority lineage a
 ### Engineering quality
 
 - adversarial authorization tests
+- execution-evidence substitution, tampering, replay, cross-lease and selector tests
 - Node 20 and Node 22 CI
 - coverage run
 - package checks
 - clean-consumer npm registry verification
+- live GitHub read and mutation proofs
 - CodeQL
 
 ## What is different from OAuth, IAM and MCP authorization?
@@ -337,7 +356,7 @@ Allow a natural workflow across mail, calendar, CRM and internal systems without
 1. **Task before credential.** A provider token is not task authority.
 2. **Mission is the ceiling.** Task Leases cannot override explicit denies.
 3. **No side effect before authorization.** Denied and step-up actions never execute.
-4. **Authority lineage matters.** Derived facts require an authorized receipt from the same Task Lease, at least one existing parent fact, and a recorded extraction selector.
+4. **Authority lineage matters.** Provider-derived authority should bind the exact allowed receipt and guarded output to a reviewed extractor; legacy host-trusted derivation remains identifiable in provenance.
 5. **No silent resource expansion.** A different concrete resource becomes an authority delta.
 6. **Task authority ends with the task.** Completion and expiry are independent from provider credential lifetime.
 7. **Authority may shrink, never silently grow.** Delegation and transport changes must preserve non-amplification.
@@ -352,7 +371,9 @@ See [SECURITY.md](SECURITY.md).
 This is still a validation implementation.
 
 - Task Lease state is currently process-local.
-- Derived-value extraction is trusted to the host/adapter; v0.4 records the source receipt and selector but does not yet cryptographically prove extraction from the provider response.
+- `deriveFromEvidence()` proves consistency with the exact output returned through the trusted Agent Authority guard, but the output is not cryptographically attested by Gmail, GitHub, or another remote provider.
+- The legacy `derive()` API remains host-trusted for compatibility; audit provenance distinguishes it from `execution-evidence-v1` derivation.
+- Source-data changes do not yet automatically invalidate already-derived authority facts.
 - Bindings currently target top-level request context fields.
 - Approved authority deltas are surfaced but not automatically applied back into a live lease.
 - GitHub token-stdin is a developer bridge, not final browser OAuth onboarding.

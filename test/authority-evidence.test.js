@@ -158,7 +158,11 @@ test('receipt and evidence from another Task Lease cannot establish authority', 
 });
 
 test('trusted extractor refuses a receipt for the wrong provider operation', async () => {
-  const taskLease = lease();
+  const taskLease = createTaskLease({
+    mission: mission(),
+    lease_id: 'lease:wrong-operation',
+    roots: [{ fact_id: 'fact:thread', kind: 'gmail.thread', value: 'thread-91' }]
+  });
   const guard = createTaskLeaseGuard({ lease: taskLease, runtime: new AuthorityRuntime() });
   const calendar = await guard.run(
     {

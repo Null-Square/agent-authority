@@ -54,6 +54,7 @@ export class RemoteMcpUpstream {
 
 export function createMcpGatewayHandler({
   mission,
+  lease,
   runtime,
   upstream,
   upstreamUrl,
@@ -63,6 +64,7 @@ export function createMcpGatewayHandler({
   const resolvedUpstream = upstream || new RemoteMcpUpstream({ url: upstreamUrl });
   const gateway = new MissionMcpGateway({
     mission,
+    lease,
     runtime,
     upstream: resolvedUpstream,
     service,
@@ -74,7 +76,9 @@ export function createMcpGatewayHandler({
       {
         name: 'agent-authority-gateway',
         version: '0.3.0',
-        description: 'Mission-aware policy gateway for MCP tools'
+        description: lease
+          ? 'Task-Lease-aware policy gateway for MCP tools'
+          : 'Mission-aware policy gateway for MCP tools'
       },
       { capabilities: { tools: {} } }
     );

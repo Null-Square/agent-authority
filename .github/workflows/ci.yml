@@ -39,6 +39,31 @@ jobs:
       - run: npm install --ignore-scripts
       - run: npm run test:coverage
 
+  packed-package-consumer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - name: Install packed artifact in a fresh consumer project
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARBALL="$(npm pack --json | node -e "let s=''; process.stdin.on('data',d=>s+=d); process.stdin.on('end',()=>process.stdout.write(JSON.parse(s)[0].filename));")"
+          ROOT="$PWD"
+          CONSUMER="$(mktemp -d)"
+          cp test/consumer/package-smoke.mjs "$CONSUMER/package-smoke.mjs"
+          cd "$CONSUMER"
+          npm init -y >/dev/null
+          npm install "$ROOT/$TARBALL" --ignore-scripts
+          if npm ls ai --all >/dev/null 2>&1; then
+            echo "FAIL -> packed Agent Authority unexpectedly installed the optional AI SDK"
+            exit 1
+          fi
+          node package-smoke.mjs
+
   ai-sdk-integration:
     runs-on: ubuntu-latest
     steps:

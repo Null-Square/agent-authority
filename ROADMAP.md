@@ -97,17 +97,21 @@ Do **not** build a general semantic policy language unless real integrations req
 
 **Success criterion:** provider-derived authority cannot be established through the strict path unless the exact guarded output, ALLOW receipt and reviewed extractor contract agree on the selected value. This behavior is now exercised across two provider mappings. Stronger provider attestation and source invalidation remain separate follow-on problems.
 
-## M4 — Same task, multiple transports
+## M4 — Same task, multiple transports — first proof established
 
 Prove Agent Authority is not an MCP product or SDK wrapper.
 
-- [ ] same Task Lease through ordinary `guard.run()` SDK call
-- [ ] same Task Lease through MCP gateway
-- [ ] same Task Lease through brokered provider execution
+- [x] same Task Lease through ordinary `guard.run()` SDK call
+- [x] same Task Lease through MCP gateway
+- [x] same Task Lease through brokered provider execution
 - [ ] at least one non-bypassable harness/tool-middleware integration
-- [ ] interoperability test vectors across transports
+- [x] interoperability test vectors across transports
 
-**Success criterion:** changing transport or harness does not expand the task's authority.
+`test/transport-invariance.test.js` establishes one `execution-evidence-v1` derived fact from brokered execution, then reuses that exact Task Lease and fact through direct SDK, MCP and brokered execution. The three paths produce the same `allow`, `authority_delta_required` and `task_lease_completed` outcomes, and blocked attempts execute zero host callbacks, MCP upstream calls or brokered provider operations.
+
+Brokered Task Lease execution deliberately does not consume mission-level one-time approval to override a lease-level authority delta. Updating a live Task Lease after explicit approval remains separate M2 work.
+
+**Success criterion:** changing transport or harness does not expand the task's authority. The SDK/MCP/broker portion is now demonstrated in-process; an external non-bypassable harness/tool-middleware integration remains the final M4 proof.
 
 ## M5 — Production credential and approval UX
 

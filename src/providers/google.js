@@ -42,6 +42,37 @@ export function gmailThreadSenderEmail(thread) {
   throw providerError('gmail_sender_missing', 'Gmail thread does not contain a usable From header');
 }
 
+/**
+ * Trusted authority-extraction contract for the normalized Gmail thread output.
+ *
+ * The extractor chooses the authority-relevant selector only. It never returns
+ * the value itself; TaskLease resolves output.sender_email after verifying the
+ * guard's execution evidence. This prevents host code from substituting another
+ * email while retaining the original Gmail receipt/evidence chain.
+ */
+export function gmailThreadSenderAuthorityExtractor({ receipt, output } = {}) {
+  if (receipt?.service !== 'gmail' || receipt?.action !== 'thread.read') {
+    throw providerError(
+      'trusted_extractor_operation_mismatch',
+      'Gmail sender authority extractor only accepts gmail:thread.read receipts'
+    );
+  }
+
+  const raw = typeof output?.sender_email === 'string' ? output.sender_email.trim() : '';
+  const normalized = extractEmailAddress(raw);
+  if (!normalized || normalized !== raw) {
+    throw providerError(
+      'trusted_extractor_output_invalid',
+      'normalized Gmail output does not contain a canonical sender_email'
+    );
+  }
+
+  return {
+    extractor_id: 'google.gmail.thread.sender-email.v1',
+    selector: 'output.sender_email'
+  };
+}
+
 function validateSendUpdates(value) {
   const normalized = value || 'none';
   if (!SEND_UPDATES.has(normalized)) {
@@ -197,5 +228,11 @@ export function createGoogleProviderAdapter({
 
   adapter.validateRequest = (request) => operationFor(request);
   adapter.isMutation = (request) => MUTATING_ACTIONS.has(request?.action);
+  adapter.authorityExtractor = (request, kind = 'email.address') => {
+    if (request?.service === 'gmail' && request?.action === 'thread.read' && kind === 'email.address') {
+      return gmailThreadSenderAuthorityExtractor;
+    }
+    return null;
+  };
   return adapter;
 }

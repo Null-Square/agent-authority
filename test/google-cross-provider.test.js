@@ -7,6 +7,7 @@ import {
   AuthorityDeniedError,
   createTaskLeaseGuard
 } from '../src/guard.js';
+import { gmailThreadSenderAuthorityExtractor } from '../src/providers/google.js';
 import { createTaskLease } from '../src/task-lease.js';
 
 function buildMission() {
@@ -33,7 +34,7 @@ function buildMission() {
   };
 }
 
-test('Gmail-derived sender bounds Calendar mutation and blocked effects never invoke provider callbacks', async () => {
+test('evidence-verified Gmail sender bounds Calendar mutation and blocked effects never invoke provider callbacks', async () => {
   const lease = createTaskLease({
     mission: buildMission(),
     request: 'schedule a meeting with the sender in thread-91',
@@ -75,18 +76,27 @@ test('Gmail-derived sender bounds Calendar mutation and blocked effects never in
     },
     async () => {
       gmailProviderCalls += 1;
-      return { sender_email: 'customer@example.com' };
+      return {
+        provider: 'gmail',
+        thread_id: 'thread-91',
+        sender_email: 'customer@example.com',
+        sender_message_id: 'message-1'
+      };
     }
   );
 
-  lease.derive({
+  const senderFact = lease.deriveFromEvidence({
     fact_id: 'fact:sender',
     kind: 'email.address',
-    value: read.output.sender_email,
     from: ['fact:thread'],
     receipt: read.receipt,
-    selector: 'output.sender_email'
+    evidence: read.evidence,
+    output: read.output,
+    extractor: gmailThreadSenderAuthorityExtractor
   });
+
+  assert.equal(senderFact.value, 'customer@example.com');
+  assert.equal(senderFact.provenance.derivation_mode, 'execution-evidence-v1');
 
   const allowed = await guard.run(
     {

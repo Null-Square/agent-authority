@@ -4,7 +4,10 @@ import {
   AuthorityDeniedError,
   createTaskLeaseGuard
 } from '../src/guard.js';
-import { gmailThreadSenderEmail } from '../src/providers/google.js';
+import {
+  gmailThreadSenderAuthorityExtractor,
+  gmailThreadSenderEmail
+} from '../src/providers/google.js';
 import { createTaskLease } from '../src/task-lease.js';
 
 const token = process.env.GOOGLE_ACCESS_TOKEN;
@@ -128,6 +131,7 @@ async function readAuthorizedThread() {
       );
       const sender = gmailThreadSenderEmail(thread);
       return {
+        provider: 'gmail',
         thread_id: thread.id,
         sender_email: sender.email,
         sender_raw: sender.raw,
@@ -198,17 +202,18 @@ try {
     throw new Error(`expected sender ${expectedSender}, got ${discovered.output.sender_email}`);
   }
 
-  lease.derive({
+  const senderFact = lease.deriveFromEvidence({
     fact_id: 'fact:sender-email',
     kind: 'email.address',
-    value: discovered.output.sender_email,
     from: ['fact:gmail-thread'],
     receipt: discovered.receipt,
-    selector: 'output.sender_email'
+    evidence: discovered.evidence,
+    output: discovered.output,
+    extractor: gmailThreadSenderAuthorityExtractor
   });
-  console.log(`2. Derived authority -> Calendar attendee ${discovered.output.sender_email}`);
+  console.log(`2. Evidence-verified authority -> Calendar attendee ${senderFact.value}`);
 
-  const allowed = await createCalendarEvent(discovered.output.sender_email, 'authorized');
+  const allowed = await createCalendarEvent(senderFact.value, 'authorized');
   createdEventId = allowed.output.event_id;
   console.log(`3. ALLOW -> real Calendar event mutation executed (${createdEventId})`);
 
@@ -228,7 +233,7 @@ try {
 
   lease.complete('live Gmail to Calendar validation complete');
   try {
-    await createCalendarEvent(discovered.output.sender_email, 'must-not-run-after-completion');
+    await createCalendarEvent(senderFact.value, 'must-not-run-after-completion');
     throw new Error('post-completion Calendar mutation unexpectedly executed');
   } catch (error) {
     if (!(error instanceof AuthorityDeniedError) || error.code !== 'task_lease_completed') {
@@ -244,7 +249,7 @@ try {
     throw new Error(`expected exactly one Calendar provider mutation after blocked attempts, got ${providerMutationCalls}`);
   }
 
-  console.log('PASS -> a sender discovered from real Gmail became exact derived authority for one real Calendar mutation');
+  console.log('PASS -> a sender discovered from real Gmail became evidence-verified exact authority for one real Calendar mutation');
   console.log('PASS -> unrelated and post-completion attempts caused zero additional Calendar provider mutations');
 } finally {
   if (createdEventId) {

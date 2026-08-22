@@ -77,19 +77,22 @@ Build only what the real M1 workflow proves necessary.
 
 **Success criterion:** a Task Lease survives daemon/process restarts without gaining authority or losing its provenance lineage.
 
-## M3 — Trustworthy derived facts
+## M3 — Trustworthy derived facts — first slice in progress
 
-Today the trusted host/adapter supplies the derived value and selector. This is an explicit v0.4 limitation.
+The first real Gmail -> Calendar integration showed that recording a host-supplied value plus selector was too weak for the strongest derived-authority claim. The compatibility `derive()` path remains host-trusted; new provider work should prefer execution-bound evidence and reviewed adapter extractors.
 
-- [ ] define a small adapter contract for extracting authority-relevant fields from provider results
-- [ ] bind derived fact records to provider/result evidence where practical
-- [ ] adversarial tests for forged extraction, confused-deputy mappings and stale facts
-- [ ] conformance fixture for operation -> resource-context mappings
-- [ ] define invalidation rules when a source resource changes
+- [x] define a small trusted-adapter extractor contract for authority-relevant normalized provider fields
+- [x] bind successful guarded outputs to the exact ALLOW receipt, request and output hash
+- [x] add `TaskLease.deriveFromEvidence()` so the caller cannot provide the authority value
+- [x] migrate Gmail sender -> Calendar attendee derivation to the evidence-verified path
+- [x] adversarial tests for value substitution, output/evidence tampering, receipt replay, cross-lease reuse, wrong-operation extraction and dangerous selectors
+- [ ] define provider/result attestation stronger than a trusted host output hash where practical
+- [ ] conformance fixtures for reviewed operation -> authority-field mappings across multiple providers
+- [ ] define freshness/invalidation rules when a source resource changes
 
 Do **not** build a general semantic policy language unless real integrations require it.
 
-**Success criterion:** an adapter cannot claim a value was derived from an authorized operation without satisfying the documented extraction/evidence contract.
+**Success criterion:** provider-derived authority cannot be established through the strict path unless the exact guarded output, ALLOW receipt and reviewed extractor contract agree on the selected value. Stronger provider attestation and source invalidation remain separate follow-on problems.
 
 ## M4 — Same task, multiple transports
 
@@ -147,7 +150,7 @@ Only after operational evidence.
 
 ## Research questions
 
-1. What is the smallest trustworthy representation of an authority-relevant derived fact?
+1. What provider-side or transport-side evidence can strengthen output integrity without turning Agent Authority into an attestation protocol?
 2. How should an approved authority delta update a running task without opening a broader wildcard permission?
 3. How should source-data changes invalidate downstream derived authority?
 4. What provider/tool metadata is required to map operations to resource context reliably?

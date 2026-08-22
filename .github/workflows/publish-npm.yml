@@ -1,0 +1,93 @@
+name: Publish npm
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    if: github.repository == 'Null-Square/agent-authority'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Verify release candidate
+        run: |
+          npm test
+          npm run test:ai-sdk
+          npm run demo:task-lease
+          npm run check:syntax
+          npm run check:package
+
+      - name: Check publication status
+        id: package
+        shell: bash
+        run: |
+          package_name=$(node -p "require('./package.json').name")
+          package_version=$(node -p "require('./package.json').version")
+          echo "name=$package_name" >> "$GITHUB_OUTPUT"
+          echo "version=$package_version" >> "$GITHUB_OUTPUT"
+          if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "${package_name}@${package_version} is already published; skipping publish."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish public Developer Preview with provenance
+        if: steps.package.outputs.published != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN is not available to this repository."
+            exit 1
+          fi
+          npm publish --access public --provenance
+
+      - name: Wait for npm registry visibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg="${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}"
+          for attempt in $(seq 1 18); do
+            if npm view "$pkg" version >/dev/null 2>&1; then
+              echo "$pkg is visible on npm."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::$pkg did not become visible on npm in time."
+          exit 1
+
+      - name: Verify fresh install from npm registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD"
+          CONSUMER="$(mktemp -d)"
+          cp test/consumer/package-smoke.mjs "$CONSUMER/package-smoke.mjs"
+          cd "$CONSUMER"
+          npm init -y >/dev/null
+          npm install "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" --ignore-scripts
+          if npm ls ai --all >/dev/null 2>&1; then
+            echo "FAIL -> registry package unexpectedly installed optional AI SDK"
+            exit 1
+          fi
+          node package-smoke.mjs

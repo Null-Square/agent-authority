@@ -8,9 +8,9 @@
 
 **Agent Authority turns a human-approved task into temporary execution authority, then keeps that authority bounded as the agent discovers resources, crosses tools, and performs side effects.**
 
-[Task Leases](docs/task-leases.md) · [Validate](docs/validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Task Leases](docs/task-leases.md) · [Validate](docs/validation.md) · [Google proof](docs/live-google-validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-> **Status: public pre-alpha / v0.4.0 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype with provenance-bound derived facts, approvals, revocation, idempotency, credential isolation, MCP v2 gateway, GitHub brokered execution, CI and CodeQL. It is not production-ready yet.
+> **Status: public pre-alpha / v0.4.1 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype with provenance-bound derived facts, approvals, revocation, idempotency, credential isolation, MCP v2 gateway, GitHub and Google provider integrations, CI and CodeQL. It is not production-ready yet.
 
 </div>
 
@@ -152,6 +152,8 @@ The demo performs this flow without provider credentials:
 
 The side-effect callbacks for blocked actions never run.
 
+The repository also includes a real Gmail → Calendar validation path and a reusable Google provider adapter. See [Live Gmail → Calendar validation](docs/live-google-validation.md).
+
 ## Minimal developer API
 
 ```js
@@ -269,6 +271,7 @@ The long-term validation target is the **same Task Lease and authority lineage a
 - AES-256-GCM local encrypted secret store
 - safe reconnect cleanup
 - GitHub brokered execution without returning the token to the agent
+- Google REST provider mappings for Gmail thread reads and Calendar event mutations
 - short-lived signed local agent-instance tokens
 - local CLI/daemon
 
@@ -278,6 +281,7 @@ The long-term validation target is the **same Task Lease and authority lineage a
 - Node 20 and Node 22 CI
 - coverage run
 - package checks
+- clean-consumer npm registry verification
 - CodeQL
 
 ## What is different from OAuth, IAM and MCP authorization?

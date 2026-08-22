@@ -1,4 +1,4 @@
-# Announcement draft — hold until registry verification
+# Announcement draft — v0.4.0 Developer Preview
 
 NullSquare is open-sourcing **Agent Authority**, an experimental runtime for task-bounded AI agent side effects.
 
@@ -7,6 +7,12 @@ AI agents often inherit account permissions much broader than the task a user ap
 A Task Lease can follow resources discovered through authorized execution without silently broadening to unrelated resources. In the public validation suite, Agent Authority discovers a live GitHub issue, derives that issue number as task authority, performs one real comment mutation, blocks a different issue before the provider call, then blocks the previously authorized issue after the task completes.
 
 The developer preview also includes a Vercel AI SDK integration that wraps ordinary `ToolLoopAgent` tools at their existing `execute` boundary.
+
+Install the published developer preview with:
+
+```bash
+npm install @nullsquare/agent-authority@0.4.0
+```
 
 **Give your agent a task, not your account.**
 

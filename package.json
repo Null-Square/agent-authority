@@ -35,12 +35,13 @@
     "demo:task-lease": "node examples/task-lease-demo.js",
     "demo:live-github": "node examples/live-github-task-lease.js",
     "demo:live-derived-github": "node examples/live-github-derived-mutation.js",
+    "demo:live-google": "node examples/live-google-cross-provider.js",
     "demo:mcp-upstream": "node examples/validation-mcp-upstream.js",
     "demo:guard": "node examples/direct-guard.js",
     "test": "node --test test/*.test.js",
     "test:ai-sdk": "node --test test/integrations/ai-sdk.integration.mjs",
     "test:coverage": "node --experimental-test-coverage --test test/*.test.js",
-    "check:syntax": "node --check src/index.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/storage.js && node --check src/runtime-env.js && node --check src/sdk.js && node --check src/server.js && node --check src/cli.js && node --check src/agent-auth.js && node --check src/approvals.js && node --check src/idempotency.js && node --check src/keys.js && node --check src/harness-bridge.js && node --check src/guard.js && node --check src/task-lease.js && node --check src/mcp-gateway.js && node --check src/mcp-remote.js && node --check src/mcp-server.js && node --check src/integrations/ai-sdk.js && node --check examples/validation-mcp-upstream.js && node --check examples/direct-guard.js && node --check examples/task-lease-demo.js && node --check examples/live-github-task-lease.js && node --check examples/live-github-derived-mutation.js",
+    "check:syntax": "node --check src/index.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/providers/google.js && node --check src/storage.js && node --check src/runtime-env.js && node --check src/sdk.js && node --check src/server.js && node --check src/cli.js && node --check src/agent-auth.js && node --check src/approvals.js && node --check src/idempotency.js && node --check src/keys.js && node --check src/harness-bridge.js && node --check src/guard.js && node --check src/task-lease.js && node --check src/mcp-gateway.js && node --check src/mcp-remote.js && node --check src/mcp-server.js && node --check src/integrations/ai-sdk.js && node --check examples/validation-mcp-upstream.js && node --check examples/direct-guard.js && node --check examples/task-lease-demo.js && node --check examples/live-github-task-lease.js && node --check examples/live-github-derived-mutation.js && node --check examples/live-google-cross-provider.js",
     "check:package": "npm pack --dry-run",
     "check": "npm run check:syntax && npm test && npm run demo:task-lease && npm run check:package"
   },
@@ -71,7 +72,8 @@
     "./sdk": "./src/sdk.js",
     "./storage": "./src/storage.js",
     "./task-lease": "./src/task-lease.js",
-    "./providers/github": "./src/providers/github.js"
+    "./providers/github": "./src/providers/github.js",
+    "./providers/google": "./src/providers/google.js"
   },
   "files": ["src", "docs", "examples", "README.md", "LICENSE", "SECURITY.md", "ROADMAP.md", "CONTRIBUTING.md"],
   "repository": { "type": "git", "url": "git+https://github.com/Null-Square/agent-authority.git" },

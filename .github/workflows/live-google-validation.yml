@@ -1,0 +1,66 @@
+name: Live Google cross-provider validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      gmail_thread_id:
+        description: Gmail thread ID approved as the Task Lease root
+        required: true
+        type: string
+      calendar_id:
+        description: Calendar ID used for the temporary event
+        required: true
+        default: primary
+        type: string
+      expected_sender:
+        description: Optional expected sender email for the fixture
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  gmail-to-calendar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install --ignore-scripts
+
+      - name: Mint short-lived Google access token
+        shell: bash
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.AA_GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.AA_GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.AA_GOOGLE_OAUTH_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          for name in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REFRESH_TOKEN; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is not configured for this repository."
+              exit 1
+            fi
+          done
+
+          response="$(curl --fail-with-body --silent --show-error \
+            -X POST https://oauth2.googleapis.com/token \
+            --data-urlencode "client_id=$GOOGLE_CLIENT_ID" \
+            --data-urlencode "client_secret=$GOOGLE_CLIENT_SECRET" \
+            --data-urlencode "refresh_token=$GOOGLE_REFRESH_TOKEN" \
+            --data-urlencode 'grant_type=refresh_token')"
+
+          token="$(printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const x=JSON.parse(s);if(!x.access_token)process.exit(2);process.stdout.write(x.access_token)})")"
+          echo "::add-mask::$token"
+          printf 'GOOGLE_ACCESS_TOKEN=%s\n' "$token" >> "$GITHUB_ENV"
+
+      - name: Prove Gmail-derived authority bounds a real Calendar mutation
+        env:
+          AA_GOOGLE_GMAIL_THREAD_ID: ${{ inputs.gmail_thread_id }}
+          AA_GOOGLE_CALENDAR_ID: ${{ inputs.calendar_id }}
+          AA_GOOGLE_EXPECTED_SENDER: ${{ inputs.expected_sender }}
+        run: npm run demo:live-google

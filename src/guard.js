@@ -1,3 +1,5 @@
+import { createExecutionEvidence } from './authority-evidence.js';
+
 export class AuthorityDeniedError extends Error {
   constructor({ result, receipt }) {
     super(result?.reason || 'action denied by Agent Authority');
@@ -25,6 +27,10 @@ export class AuthorityApprovalRequiredError extends Error {
  * authority boundary returns ALLOW. A guard can use either a static mission or
  * a TaskLease. Task leases add provenance-bound restrictions without changing
  * the host application's credential ownership.
+ *
+ * Successful effects also return execution evidence binding the exact output
+ * hash to the ALLOW receipt. TaskLease.deriveFromEvidence() can use that record
+ * with a trusted adapter extractor so callers do not provide derived values.
  */
 export class AuthorityGuard {
   constructor({ mission, lease, runtime, onDecision } = {}) {
@@ -66,7 +72,8 @@ export class AuthorityGuard {
     }
 
     const output = await effect();
-    return { output, result: evaluation.result, receipt: evaluation.receipt };
+    const evidence = createExecutionEvidence({ receipt: evaluation.receipt, output });
+    return { output, result: evaluation.result, receipt: evaluation.receipt, evidence };
   }
 }
 

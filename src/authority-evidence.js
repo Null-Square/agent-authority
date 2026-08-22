@@ -22,6 +22,13 @@ function unsignedEvidence(evidence = {}) {
   return unsigned;
 }
 
+function hashExecutionOutput(output) {
+  return hashObject({
+    output_type: output === null ? 'null' : typeof output,
+    output
+  });
+}
+
 /**
  * Bind the exact output returned by an authorized effect to its decision receipt.
  *
@@ -41,7 +48,7 @@ export function createExecutionEvidence({ receipt, output } = {}) {
     service: receipt.service,
     action: receipt.action,
     request_hash: receipt.request_hash,
-    output_hash: hashObject(output)
+    output_hash: hashExecutionOutput(output)
   };
   return { ...evidence, evidence_hash: hashObject(evidence) };
 }
@@ -72,7 +79,7 @@ export function verifyExecutionEvidence({ receipt, output, evidence } = {}) {
   if (evidence.request_hash !== receipt.request_hash) {
     throw evidenceError('evidence_request_mismatch', 'execution evidence request does not match its receipt');
   }
-  if (hashObject(output) !== evidence.output_hash) {
+  if (hashExecutionOutput(output) !== evidence.output_hash) {
     throw evidenceError('evidence_output_mismatch', 'provider output no longer matches the authorized execution evidence');
   }
   return evidence;

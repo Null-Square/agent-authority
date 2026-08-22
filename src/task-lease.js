@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { assertMission, createReceipt, hashObject, matchPattern } from './index.js';
+import {
+  resolveEvidenceSelector,
+  runAuthorityExtractor,
+  verifyExecutionEvidence
+} from './authority-evidence.js';
 
 function authorityError(code, message) {
   const error = new Error(message);
@@ -95,6 +100,12 @@ export class TaskLease {
     return structuredClone(fact);
   }
 
+  /**
+   * Legacy host-trusted derivation path.
+   *
+   * The caller supplies both value and selector. Keep this API for compatibility,
+   * but prefer deriveFromEvidence() for authority-relevant provider outputs.
+   */
   derive({ fact_id, kind = 'opaque', value, from = [], receipt, selector } = {}) {
     if (!fact_id) throw new Error('derived fact_id is required');
     if (value === undefined) throw new Error('derived value is required');
@@ -125,6 +136,7 @@ export class TaskLease {
       value,
       provenance: {
         type: 'derived',
+        derivation_mode: 'host-trusted',
         from: parents,
         task_lease_id: this.lease_id,
         receipt_id: receipt.receipt_id,
@@ -133,6 +145,71 @@ export class TaskLease {
         source_action: receipt.action,
         source_request_hash: receipt.request_hash,
         selector: selector.trim()
+      },
+      created_at: new Date().toISOString()
+    };
+    this.facts.set(fact_id, fact);
+    return structuredClone(fact);
+  }
+
+  /**
+   * Strict derivation path for provider data.
+   *
+   * The caller cannot supply the authority value. A trusted adapter extractor
+   * identifies one normalized output selector, TaskLease resolves that selector
+   * itself, and execution evidence proves the output still matches the exact
+   * ALLOW receipt returned by guard.run().
+   */
+  deriveFromEvidence({
+    fact_id,
+    kind = 'opaque',
+    from = [],
+    receipt,
+    evidence,
+    output,
+    extractor
+  } = {}) {
+    if (!fact_id) throw new Error('derived fact_id is required');
+    if (this.facts.has(fact_id)) throw authorityError('fact_exists', `authority fact ${fact_id} already exists`);
+    if (!receipt) throw authorityError('receipt_required', 'derived authority requires an authorized source receipt');
+    if (receipt.decision !== 'allow') throw authorityError('receipt_not_authorized', 'derived authority requires an ALLOW receipt');
+    if (receipt.mission_id !== this.mission.mission_id) {
+      throw authorityError('receipt_mission_mismatch', 'source receipt belongs to another mission');
+    }
+    if (receipt.task_lease_id !== this.lease_id) {
+      throw authorityError('receipt_lease_mismatch', 'source receipt belongs to another task lease');
+    }
+
+    const parents = [...new Set(from)];
+    if (parents.length === 0) {
+      throw authorityError('parent_fact_required', 'derived authority must descend from at least one existing task authority fact');
+    }
+    for (const parentId of parents) {
+      if (!this.facts.has(parentId)) throw authorityError('parent_fact_missing', `authority fact ${parentId} does not exist`);
+    }
+
+    verifyExecutionEvidence({ receipt, output, evidence });
+    const extraction = runAuthorityExtractor({ extractor, receipt, output });
+    const value = resolveEvidenceSelector(output, extraction.selector);
+
+    const fact = {
+      fact_id,
+      kind,
+      value,
+      provenance: {
+        type: 'derived',
+        derivation_mode: 'execution-evidence-v1',
+        from: parents,
+        task_lease_id: this.lease_id,
+        receipt_id: receipt.receipt_id,
+        receipt_hash: receipt.receipt_hash,
+        source_service: receipt.service,
+        source_action: receipt.action,
+        source_request_hash: receipt.request_hash,
+        selector: extraction.selector,
+        extractor_id: extraction.extractor_id,
+        source_output_hash: evidence.output_hash,
+        execution_evidence_hash: evidence.evidence_hash
       },
       created_at: new Date().toISOString()
     };

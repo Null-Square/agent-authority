@@ -8,9 +8,9 @@
 
 **Agent Authority turns a human-approved task into temporary execution authority, then keeps that authority bounded as the agent discovers resources, crosses tools, and performs side effects.**
 
-[Task Leases](docs/task-leases.md) · [Validate](docs/validation.md) · [Google proof](docs/live-google-validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Task Leases](docs/task-leases.md) · [Executable evidence](docs/evidence.md) · [Extractor conformance](docs/authority-extractor-conformance.md) · [Google proof](docs/live-google-validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-> **Status: public pre-alpha / v0.4.2 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype, execution-bound derived facts, approvals, revocation, idempotency, credential isolation, MCP v2 gateway, GitHub and Google provider integrations, CI and CodeQL. It is not production-ready yet.
+> **Status: public pre-alpha / v0.4.3 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype, execution-bound derived facts, reviewed Google and GitHub authority extractors, two-provider conformance tests, approvals, revocation, idempotency, credential isolation, MCP v2 gateway, live GitHub proofs, CI and CodeQL. It is not production-ready yet.
 
 </div>
 
@@ -158,7 +158,9 @@ The demo performs this flow without provider credentials:
 
 The side-effect callbacks for blocked actions never run.
 
-The repository also includes a real Gmail → Calendar validation path and a reusable Google provider adapter. The stricter v0.4.2 path binds the derived sender to the exact guarded output before it becomes authority. See [Live Gmail → Calendar validation](docs/live-google-validation.md) and [Executable Evidence](docs/evidence.md).
+The repository also includes a real Gmail → Calendar validation path and a reusable Google provider adapter. The strict path binds the derived sender to the exact guarded output before it becomes authority. See [Live Gmail → Calendar validation](docs/live-google-validation.md) and [Executable Evidence](docs/evidence.md).
+
+v0.4.3 applies the **same primitive to GitHub**: a root-bound repository + fixture marker are used by the reviewed GitHub adapter to select one issue from a real `issue.list` response; `deriveFromEvidence()` establishes that exact issue number as downstream authority; one real comment mutation succeeds; unrelated and post-completion issue mutations never reach the provider. Google and GitHub are now exercised by the same [authority extractor conformance contract](docs/authority-extractor-conformance.md).
 
 ## Minimal developer API
 
@@ -264,6 +266,8 @@ The long-term validation target is the **same Task Lease and authority lineage a
 - execution evidence binding an allowed receipt, request and exact output hash
 - strict `deriveFromEvidence()` path where the caller cannot provide the authority value
 - reviewed Gmail sender authority extractor bound to `gmail:thread.read`
+- reviewed GitHub selected-issue-number extractor bound to marker-scoped `github:issue.list`
+- shared Google/GitHub authority-extractor conformance suite
 - legacy host-trusted `derive()` compatibility path
 - required parent lineage and extraction selector
 - exact context-field bindings
@@ -288,6 +292,7 @@ The long-term validation target is the **same Task Lease and authority lineage a
 - AES-256-GCM local encrypted secret store
 - safe reconnect cleanup
 - GitHub brokered execution without returning the token to the agent
+- GitHub REST mappings for repository access plus evidence-derived `issue.list` / `issue.comment`
 - Google REST provider mappings for Gmail thread reads and Calendar event mutations
 - short-lived signed local agent-instance tokens
 - local CLI/daemon
@@ -296,11 +301,12 @@ The long-term validation target is the **same Task Lease and authority lineage a
 
 - adversarial authorization tests
 - execution-evidence substitution, tampering, replay, cross-lease and selector tests
+- the same provider-derived-authority conformance attacks against Google and GitHub
 - Node 20 and Node 22 CI
 - coverage run
 - package checks
 - clean-consumer npm registry verification
-- live GitHub read and mutation proofs
+- live GitHub read and evidence-derived mutation proofs
 - CodeQL
 
 ## What is different from OAuth, IAM and MCP authorization?

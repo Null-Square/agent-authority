@@ -10,9 +10,17 @@
 
 [Task Leases](docs/task-leases.md) · [Validate](docs/validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-> **Status: public pre-alpha / v0.4 validation candidate.** The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype with provenance-bound derived facts, approvals, revocation, idempotency, credential isolation, MCP v2 gateway, GitHub brokered execution, CI and CodeQL. It is not production-ready yet.
+> **Status: public pre-alpha / v0.4.0 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype with provenance-bound derived facts, approvals, revocation, idempotency, credential isolation, MCP v2 gateway, GitHub brokered execution, CI and CodeQL. It is not production-ready yet.
 
 </div>
+
+## Install
+
+Requires Node.js 20+.
+
+```bash
+npm install @nullsquare/agent-authority
+```
 
 ## The problem
 

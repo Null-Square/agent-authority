@@ -56,6 +56,10 @@ jobs:
           import { createExecutionEvidence } from '@nullsquare/agent-authority/authority-evidence';
           import { createTaskLease } from '@nullsquare/agent-authority/task-lease';
           import {
+            createGitHubProviderAdapter,
+            githubIssueListSelectedNumberAuthorityExtractor
+          } from '@nullsquare/agent-authority/providers/github';
+          import {
             createGoogleProviderAdapter,
             gmailThreadSenderAuthorityExtractor
           } from '@nullsquare/agent-authority/providers/google';
@@ -64,5 +68,7 @@ jobs:
           if (typeof createExecutionEvidence !== 'function') throw new Error('Authority evidence export missing');
           if (typeof createGoogleProviderAdapter !== 'function') throw new Error('Google provider export missing');
           if (typeof gmailThreadSenderAuthorityExtractor !== 'function') throw new Error('Gmail authority extractor export missing');
+          if (typeof createGitHubProviderAdapter !== 'function') throw new Error('GitHub provider export missing');
+          if (typeof githubIssueListSelectedNumberAuthorityExtractor !== 'function') throw new Error('GitHub authority extractor export missing');
           console.log('registry consumer exports verified');
           NODE

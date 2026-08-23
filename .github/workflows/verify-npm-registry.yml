@@ -44,15 +44,16 @@ jobs:
           actual=$(npm view "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" version)
           test "$actual" = "${{ steps.package.outputs.version }}"
 
-      # The repository consumer smoke is the release-facing contract. For
-      # v0.4.6 it includes the task-first API, authority-delta explanation and
-      # durable-store opt-in in addition to the lower-level evidence surfaces.
+      # The registry consumer is the release-facing contract. v0.4.7 adds the
+      # connected task surface to the existing task-first, durability, evidence
+      # and transport smoke coverage.
       - name: Verify clean registry consumer and current public behavior
         shell: bash
         run: |
           set -euo pipefail
           CONSUMER="$(mktemp -d)"
           cp "$GITHUB_WORKSPACE/test/consumer/package-smoke.mjs" "$CONSUMER/package-smoke.mjs"
+          cp "$GITHUB_WORKSPACE/test/consumer/connected-smoke.mjs" "$CONSUMER/connected-smoke.mjs"
           cd "$CONSUMER"
           npm init -y >/dev/null
           npm install "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" --ignore-scripts
@@ -61,3 +62,4 @@ jobs:
             exit 1
           fi
           node package-smoke.mjs
+          node connected-smoke.mjs

@@ -30,8 +30,9 @@ The engine has enough depth to test whether developers actually want this layer.
 - [x] task-first facade over Mission + Task Lease + Guard
 - [x] explicit service permissions without requiring hand-authored Mission JSON
 - [x] named task authority roots
-- [x] `task.run()` guarded effect boundary
-- [x] `task.authorityFrom()` strict evidence-derived authority
+- [x] `task.run()` guarded application-owned effect boundary
+- [x] `task.execute()` connected-provider effect boundary with broker-owned credential resolution
+- [x] `task.authorityFrom()` strict evidence-derived authority from `run()` or successful `execute()` output
 - [x] task-first binding of named authority to later effects
 - [x] human-readable authority-delta explanation
 - [x] same task-first calls can opt into durable local state by adding a store
@@ -42,6 +43,7 @@ The engine has enough depth to test whether developers actually want this layer.
 - [x] self-contained operations/finance proof: ticket -> order -> payment -> exact full refund
 - [x] automated blank-project quickstart against the current published npm package
 - [x] blank-project real-provider quickstart: broad standing `repo.read` -> one task-authorized public GitHub repository
+- [x] encrypted connected GitHub onboarding: stdin credential -> local vault/broker -> `task.execute()` -> live provider request
 - [ ] coding workflow: issue -> branch -> files -> PR, with merge/deploy outside authority
 - [ ] support/communications expansion: customer -> meeting + reply/CRM, or live task-first Google Actions proof
 - [ ] bounded finance refund: derived payment amount can authorize a smaller refund without authorizing an over-refund
@@ -54,9 +56,11 @@ The support/communications proof uses the same task-first API across Gmail and C
 
 The operations/finance proof keeps one evidence-derived chain from support ticket -> order -> payment -> exact refund. The exact payment ID, amount in minor units, and currency are all bound before the refund callback can execute. Unrelated payment, over-refund, wrong currency, partial refund under the current equality model, and post-completion refund all execute zero additional refund callbacks. This proof exposed a deliberate product gap: current bindings are exact equality, so a legitimate partial refund also steps up. Do not add a general expression language; add a narrow derived numeric ceiling only when real workflow/adoption evidence shows partial refunds are required.
 
-The fixture fresh-install quickstart is independently exercised from a blank Node 20 project against the latest public npm package. The passing proof installed `@nullsquare/agent-authority@0.4.6`, did not install the optional AI SDK, allowed the exact issue #42 effect, stepped up unrelated issue #7, and observed no unrelated callback. This is automated compatibility evidence, not a substitute for the still-open first-time-human under-10-minute test.
+The fixture fresh-install quickstart is independently exercised from blank Node 20 projects against the public npm package. The release-facing registry verifier for v0.4.7 installs that exact package, confirms the optional AI SDK is absent, and runs the ordinary public consumer contract plus the connected-execution consumer contract. This is automated compatibility evidence, not a substitute for the still-open first-time-human under-10-minute test.
 
-The live fresh-install quickstart goes one step further from another blank Node 20 project: Mission-level `github:repo.read` remains broader than the task, Task authority binds that action to `Null-Square/agent-authority`, one real public GitHub API call succeeds, and `octocat/Hello-World` produces `authority_delta_required` before a second `fetch()` can run. No credential is required for the default public-repository path. Authenticated/private-repository onboarding remains separate follow-on work.
+The live credential-free quickstart keeps Mission-level `github:repo.read` broader than the task, binds Task authority to `Null-Square/agent-authority`, performs one real public GitHub API call, and produces `authority_delta_required` for `octocat/Hello-World` before a second `fetch()` can run.
+
+v0.4.7 adds the authenticated connected path without creating an OAuth platform: a GitHub credential is accepted on stdin, stored in the encrypted trusted-local-host vault, resolved only inside the broker/provider runtime, and used by `task.execute()`. The live CI proof uses the repository's GitHub Actions installation token, confirms the raw token is not present in public task/connection state or plaintext under the Agent Authority home, executes the task-authorized repository read, and blocks the unrelated repository before connected provider execution. A fine-grained PAT or GitHub App token can use the same path for repositories it is allowed to access; public CI does not independently claim access to an unrelated private repository.
 
 Current utility regression metrics:
 
@@ -158,6 +162,7 @@ Do **not** build a general semantic policy language around this primitive.
 - [x] same Task Lease through direct guard/SDK execution
 - [x] same Task Lease through MCP gateway
 - [x] same Task Lease through brokered provider execution
+- [x] task-first connected-provider execution through `task.execute()`
 - [x] real Vercel AI SDK protected-tool path
 - [x] interoperability/adversarial vectors across transports
 
@@ -169,7 +174,10 @@ Prioritize only the UX needed by successful P0 workflows.
 
 - [x] credential-free fresh-install quickstart validated against the current public npm package
 - [x] one low-friction real provider onboarding path: public GitHub read from a blank npm project
-- [ ] authenticated/private-provider onboarding path
+- [x] authenticated connected-provider onboarding path: GitHub stdin credential + encrypted local vault + `task.execute()`
+- [x] safe sole-account default resolution; multiple connected accounts require explicit selection
+- [ ] independent private-repository onboarding proof with a credential that has private-repo access
+- [ ] production provider credential lifecycle / OAuth or GitHub App onboarding where real users require it
 - [ ] compact approval UI showing the exact authority delta
 - [ ] automatic short-lived agent session bootstrap where needed
 - [ ] framework integration starter focused on task-first API

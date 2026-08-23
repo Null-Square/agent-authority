@@ -41,6 +41,7 @@ The engine has enough depth to test whether developers actually want this layer.
 - [x] self-contained support/communications proof: Gmail thread -> exact Calendar attendee
 - [x] self-contained operations/finance proof: ticket -> order -> payment -> exact full refund
 - [x] automated blank-project quickstart against the current published npm package
+- [x] blank-project real-provider quickstart: broad standing `repo.read` -> one task-authorized public GitHub repository
 - [ ] coding workflow: issue -> branch -> files -> PR, with merge/deploy outside authority
 - [ ] support/communications expansion: customer -> meeting + reply/CRM, or live task-first Google Actions proof
 - [ ] bounded finance refund: derived payment amount can authorize a smaller refund without authorizing an over-refund
@@ -53,7 +54,9 @@ The support/communications proof uses the same task-first API across Gmail and C
 
 The operations/finance proof keeps one evidence-derived chain from support ticket -> order -> payment -> exact refund. The exact payment ID, amount in minor units, and currency are all bound before the refund callback can execute. Unrelated payment, over-refund, wrong currency, partial refund under the current equality model, and post-completion refund all execute zero additional refund callbacks. This proof exposed a deliberate product gap: current bindings are exact equality, so a legitimate partial refund also steps up. Do not add a general expression language; add a narrow derived numeric ceiling only when real workflow/adoption evidence shows partial refunds are required.
 
-The fresh-install quickstart is now independently exercised from a blank Node 20 project against the latest public npm package. The passing proof installed `@nullsquare/agent-authority@0.4.6`, did not install the optional AI SDK, allowed the exact issue #42 effect, stepped up unrelated issue #7, and observed no unrelated callback. This is automated compatibility evidence, not a substitute for the still-open first-time-human under-10-minute test.
+The fixture fresh-install quickstart is independently exercised from a blank Node 20 project against the latest public npm package. The passing proof installed `@nullsquare/agent-authority@0.4.6`, did not install the optional AI SDK, allowed the exact issue #42 effect, stepped up unrelated issue #7, and observed no unrelated callback. This is automated compatibility evidence, not a substitute for the still-open first-time-human under-10-minute test.
+
+The live fresh-install quickstart goes one step further from another blank Node 20 project: Mission-level `github:repo.read` remains broader than the task, Task authority binds that action to `Null-Square/agent-authority`, one real public GitHub API call succeeds, and `octocat/Hello-World` produces `authority_delta_required` before a second `fetch()` can run. No credential is required for the default public-repository path. Authenticated/private-repository onboarding remains separate follow-on work.
 
 Current utility regression metrics:
 
@@ -165,8 +168,9 @@ Changing transport or configured harness execution path does not expand task aut
 Prioritize only the UX needed by successful P0 workflows.
 
 - [x] credential-free fresh-install quickstart validated against the current public npm package
+- [x] one low-friction real provider onboarding path: public GitHub read from a blank npm project
+- [ ] authenticated/private-provider onboarding path
 - [ ] compact approval UI showing the exact authority delta
-- [ ] one low-friction real provider onboarding path
 - [ ] automatic short-lived agent session bootstrap where needed
 - [ ] framework integration starter focused on task-first API
 - [ ] external-developer quickstart feedback loop

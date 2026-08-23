@@ -13,14 +13,14 @@ Before any publication:
 After publication, verify from a fresh project with:
 
 ```bash
-npm install @nullsquare/agent-authority@0.4.6
+npm install @nullsquare/agent-authority@0.4.7
 ```
 
-Then run the same consumer smoke flow through the registry-installed package. Registry verification is part of the release gate; a successful `npm publish` command alone is not sufficient.
+Then run the same consumer smoke flows through the registry-installed package. Registry verification is part of the release gate; a successful `npm publish` command alone is not sufficient.
 
 The repository includes `.github/workflows/verify-npm-registry.yml`, which verifies registry visibility, a clean Node.js 20 install, and current public behavior from the registry artifact.
 
-For v0.4.6 the consumer exercises:
+For v0.4.7 the registry consumer exercises the existing v0.4.6 contract plus connected provider execution:
 
 - `createTask()` from `@nullsquare/agent-authority/task`;
 - explicit task permissions and named authority roots;
@@ -30,11 +30,15 @@ For v0.4.6 the consumer exercises:
 - execution evidence and the reviewed Google/GitHub authority extractors;
 - `ExecutingAuthorityRuntime.executeTaskLease()` and `MissionMcpGateway` transport surfaces;
 - `JsonFileTaskLeaseStore`, `DurableTaskLeaseSession`, and the lower-level Task Lease APIs;
+- `task.execute(request)` for connected-provider execution;
+- the public `@nullsquare/agent-authority/runtime-env` export;
+- safe sole-account connection resolution while multiple active accounts remain ambiguous/fail closed;
+- connected execution where the credential is broker-internal, the task-authorized resource executes, and an unrelated resource is blocked before a second provider call;
 - the requirement that the optional `ai` package is not installed as a production dependency.
 
-This makes the registry artifact verification cover the product-facing task-first API and the lower-level durability/evidence/transport surfaces it composes, rather than checking export names alone.
+This makes the registry artifact verification cover both application-owned task effects (`task.run`) and broker-owned connected provider effects (`task.execute`) together with the durability/evidence/transport surfaces they compose.
 
-The v0.4.6 independent registry verification passed after publication: npm visibility succeeded and the fresh Node.js 20 registry-installed consumer executed the current task-first + durable behavior smoke successfully.
+The v0.4.7 independent registry verification passed after publication: npm visibility succeeded, a fresh Node.js 20 consumer installed the exact `@nullsquare/agent-authority@0.4.7` artifact, the optional AI SDK was absent, and both the ordinary package smoke and connected-execution smoke passed.
 
 The deterministic task utility fixture is also part of the source-release gate. It currently requires:
 
@@ -52,7 +56,7 @@ This fixture is a regression gate, not a real-world performance benchmark.
 Publishing to the public npm registry does not automatically create either a GitHub Release or a GitHub Packages entry.
 
 - **npm registry** — `npm publish --access public` publishes `@nullsquare/agent-authority` to `registry.npmjs.org` / npmjs.com. This is the package users install with `npm install`.
-- **GitHub Releases** — a separate GitHub object, normally backed by a Git tag such as `v0.4.6`. A release must be created explicitly or by release automation.
+- **GitHub Releases** — a separate GitHub object, normally backed by a Git tag such as `v0.4.7`. A release must be created explicitly or by release automation.
 - **GitHub Packages** — a separate package registry. It only appears when the package is published to GitHub's npm registry (`npm.pkg.github.com`); publishing to npmjs.com does not populate it.
 
 Agent Authority currently uses npmjs.com as its public package registry. Therefore an empty GitHub **Packages** section is expected unless the project intentionally adopts dual publication. A GitHub **Release** is still useful for source-release discoverability and should track published versions, but it is independent from npm publication.

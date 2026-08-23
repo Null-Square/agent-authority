@@ -26,6 +26,7 @@ jobs:
       - run: npm install --ignore-scripts
       - run: npm test
       - run: npm run demo:task
+      - run: npm run demo:task-coding
       - run: node examples/task-first-support.js
       - run: node examples/task-first-finance.js
       - run: npm run benchmark:task
@@ -60,6 +61,7 @@ jobs:
           CONSUMER="$(mktemp -d)"
           cp test/consumer/package-smoke.mjs "$CONSUMER/package-smoke.mjs"
           cp test/consumer/connected-smoke.mjs "$CONSUMER/connected-smoke.mjs"
+          cp test/consumer/coding-smoke.mjs "$CONSUMER/coding-smoke.mjs"
           cd "$CONSUMER"
           npm init -y >/dev/null
           npm install "$ROOT/$TARBALL" --ignore-scripts
@@ -69,6 +71,7 @@ jobs:
           fi
           node package-smoke.mjs
           node connected-smoke.mjs
+          node coding-smoke.mjs
 
   ai-sdk-integration:
     runs-on: ubuntu-latest

@@ -26,6 +26,7 @@ jobs:
       - run: npm install --ignore-scripts
       - run: npm test
       - run: npm run demo:task
+      - run: node examples/task-first-support.js
       - run: npm run benchmark:task
       - run: npm run demo:task-lease
       - run: npm run check:syntax

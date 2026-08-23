@@ -38,13 +38,16 @@ The engine has enough depth to test whether developers actually want this layer.
 - [x] self-contained GitHub-shaped task-first demo
 - [x] deterministic utility regression benchmark
 - [x] first live provider proof through task-first API: GitHub issue discovery -> exact issue comment
+- [x] self-contained support/communications proof: Gmail thread -> exact Calendar attendee
 - [ ] coding workflow: issue -> branch -> files -> PR, with merge/deploy outside authority
-- [ ] support/communications workflow: email -> customer -> meeting/CRM/reply target
+- [ ] support/communications expansion: customer -> meeting + reply/CRM, or live task-first Google Actions proof
 - [ ] operations/finance workflow: ticket -> order -> payment -> bounded refund
 - [ ] first-time developer can complete a meaningful integration in under 10 minutes
 - [ ] at least one external developer adopts the package without project-author assistance
 
 The live GitHub task-first proof selected issue #9 through the reviewed provider mapping, established that issue through `task.authorityFrom()`, executed exactly one real comment mutation, blocked unrelated issue #1 with `authority_delta_required`, surfaced the established-vs-requested explanation, denied the same issue after task completion, and observed `reads=1` / `task_mutations=1` before cleanup.
+
+The support/communications proof uses the same task-first API across Gmail and Calendar: one authorized `thread_id` establishes one canonical `sender_email` through the reviewed Google extractor; only that attendee can be used for the task-bound Calendar event, while another thread or attendee executes zero provider-shaped callbacks. The example mirrors the real Google adapter contract but does not replace the still-open public Google Actions evidence gate.
 
 Current utility regression metrics:
 

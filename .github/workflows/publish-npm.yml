@@ -83,6 +83,7 @@ jobs:
           set -euo pipefail
           CONSUMER="$(mktemp -d)"
           cp test/consumer/package-smoke.mjs "$CONSUMER/package-smoke.mjs"
+          cp test/consumer/connected-smoke.mjs "$CONSUMER/connected-smoke.mjs"
           cd "$CONSUMER"
           npm init -y >/dev/null
           npm install "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" --ignore-scripts
@@ -91,3 +92,4 @@ jobs:
             exit 1
           fi
           node package-smoke.mjs
+          node connected-smoke.mjs

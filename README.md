@@ -6,11 +6,11 @@
 
 ### Give your agent a task, not your account.
 
-**Agent Authority turns a human-approved task into temporary execution authority, then keeps that authority bounded as the agent discovers resources, crosses tools, and performs side effects.**
+**Agent Authority turns a human-approved task into temporary execution authority, then keeps that authority bounded as the agent discovers resources, crosses tools, survives local process restarts, and performs side effects.**
 
-[Task Leases](docs/task-leases.md) · [Executable evidence](docs/evidence.md) · [Extractor conformance](docs/authority-extractor-conformance.md) · [Transport invariance](docs/transport-invariance.md) · [Google proof](docs/live-google-validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Task Leases](docs/task-leases.md) · [Durable Task Leases](docs/durable-task-leases.md) · [Executable evidence](docs/evidence.md) · [Extractor conformance](docs/authority-extractor-conformance.md) · [Transport invariance](docs/transport-invariance.md) · [Google proof](docs/live-google-validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-> **Status: public pre-alpha / v0.4.4 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype, execution-bound derived facts, reviewed Google and GitHub authority extractors, two-provider conformance tests, Task-Lease-aware SDK/MCP/broker execution, a real Vercel AI SDK harness proof, approvals, revocation, idempotency, credential isolation, live GitHub proofs, CI and CodeQL. It is not production-ready yet.
+> **Status: public pre-alpha / v0.4.5 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Leases, execution-bound derived facts, reviewed Google and GitHub authority extractors, Task-Lease-aware SDK/MCP/broker execution, a real Vercel AI SDK harness proof, authenticated local Task Lease recovery, transactional durable state with stale-writer protection, automatic durable Task Lease sessions, approvals, revocation, idempotency, credential isolation, live GitHub proofs, CI and CodeQL. It is not production-ready yet.
 
 </div>
 
@@ -131,7 +131,7 @@ The mission remains the ceiling. A Task Lease may narrow an action to resources 
 
 More generally:
 
-> **Authority may stay the same or shrink as it moves through agents, tools and transports. It must never silently grow.**
+> **Authority may stay the same or shrink as it moves through agents, tools, transports and durable state. It must never silently grow.**
 
 ## Run the derived-authority demo
 
@@ -160,9 +160,11 @@ The side-effect callbacks for blocked actions never run.
 
 The repository also includes a real Gmail → Calendar validation path and a reusable Google provider adapter. The strict path binds the derived sender to the exact guarded output before it becomes authority. See [Live Gmail → Calendar validation](docs/live-google-validation.md) and [Executable Evidence](docs/evidence.md).
 
-v0.4.3 applied the **same evidence-derived authority primitive to GitHub**: a root-bound repository + fixture marker are used by the reviewed GitHub adapter to select one issue from a real `issue.list` response; `deriveFromEvidence()` establishes that exact issue number as downstream authority; one real comment mutation succeeds; unrelated and post-completion issue mutations never reach the provider. Google and GitHub are exercised by the same [authority extractor conformance contract](docs/authority-extractor-conformance.md).
+v0.4.3 applied the **same evidence-derived authority primitive to GitHub**: a root-bound repository + fixture marker are used by the reviewed GitHub adapter to select one issue from a real `issue.list` response; `deriveFromEvidence()` establishes that exact issue number as downstream authority; one real comment mutation succeeds; unrelated and post-completion issue mutations never reach the provider.
 
-v0.4.4 adds the **transport-invariance proof**: one `execution-evidence-v1` derived fact is established under one Task Lease, then that exact lease and fact constrain ordinary `guard.run()`, the MCP gateway and brokered provider execution. The same allowed resource succeeds, an unrelated resource produces `authority_delta_required` with zero blocked callbacks/provider calls, and task completion produces `task_lease_completed` across all three paths. The repository also drives a real Vercel AI SDK `ToolLoopAgent` through `protectAiSdkTools()`: unrelated resources, unmapped executable tools and completed leases are surfaced as tool errors while the underlying side-effect counters remain zero. See [Task Lease transport invariance](docs/transport-invariance.md).
+v0.4.4 added the **transport-invariance proof**: one evidence-derived fact under one Task Lease constrains ordinary `guard.run()`, the MCP gateway, brokered provider execution and a configured Vercel AI SDK `ToolLoopAgent` protected-tool path. See [Task Lease transport invariance](docs/transport-invariance.md).
+
+v0.4.5 adds **durable Task Lease authority state** on the trusted local host. Authenticated snapshots survive process restart, exact mission identity and provenance are revalidated before recovery, local mutations use an atomic transaction/CAS boundary, stale workers cannot silently overwrite newer authority, and `DurableTaskLeaseSession` routes ordinary Task Lease mutations through that boundary. The independent npm registry verifier installs v0.4.5 into a clean Node 20 consumer and executes this durable session behavior from the registry artifact. See [Durable Task Leases](docs/durable-task-leases.md).
 
 ## Minimal developer API
 
@@ -208,19 +210,47 @@ const senderFact = lease.deriveFromEvidence({
   output: read.output,
   extractor: gmailThreadSenderAuthorityExtractor
 });
-
-await guard.run({
-  service: 'calendar',
-  action: 'event.create',
-  context: { attendee_email: senderFact.value }
-}, () => calendar.createEvent({ attendee: senderFact.value }));
 ```
 
 `deriveFromEvidence()` does not accept the authority value. The reviewed extractor selects a normalized output field, and Task Lease resolves that value only after verifying that the output still matches the exact allowed execution evidence.
 
 The older `derive()` API remains available as the explicitly **host-trusted compatibility path**.
 
-The host keeps its existing SDK, connector and authentication. Agent Authority controls whether the effect may happen.
+## Durable Task Lease API
+
+For local workflows that must survive process restart or coordinate multiple cooperating workers, use the authenticated store plus durable session facade:
+
+```js
+import { JsonFileTaskLeaseStore } from '@nullsquare/agent-authority/storage';
+import {
+  createDurableTaskLeaseSession
+} from '@nullsquare/agent-authority/durable-task-lease';
+import { createTaskLeaseGuard } from '@nullsquare/agent-authority/guard';
+
+const store = new JsonFileTaskLeaseStore({
+  dir: config.paths.task_leases,
+  keyPath: config.paths.master_key
+});
+
+const session = createDurableTaskLeaseSession({ store, lease });
+const guard = createTaskLeaseGuard({ lease: session, runtime });
+
+const read = await guard.run(request, () => provider.read());
+
+session.deriveFromEvidence({
+  fact_id: 'fact:selected',
+  kind: 'provider.resource',
+  from: ['fact:root'],
+  receipt: read.receipt,
+  evidence: read.evidence,
+  output: read.output,
+  extractor
+});
+```
+
+The session keeps its mutable Task Lease private. `addRoot()`, `derive()`, `deriveFromEvidence()`, `bind()` and `complete()` commit through the store's compare-and-swap transaction boundary. A stale session receives `task_lease_state_conflict` and must refresh/reconsider rather than silently replaying an authority mutation against newer state.
+
+Security-critical session evaluation refreshes authenticated durable state first, so another worker's already-committed completion or narrowing is observed before the next decision.
 
 ## Three integration modes, one authority model
 
@@ -232,15 +262,11 @@ Agent Authority is deliberately **not tied to MCP, OAuth, or one agent framework
 agent code -> guard.run() -> existing SDK / API
 ```
 
-Best when the application already owns the provider connection.
-
 ### 2. MCP gateway
 
 ```text
 MCP host -> Agent Authority -> existing MCP server
 ```
-
-Best when the harness already speaks MCP. MCP is an integration transport, not the product identity.
 
 ### 3. Brokered execution
 
@@ -248,9 +274,7 @@ Best when the harness already speaks MCP. MCP is an integration transport, not t
 agent -> Agent Authority -> isolated credential -> provider
 ```
 
-Best when the agent should not receive the provider credential at all.
-
-v0.4.4 demonstrates the **same Task Lease and authority fact across all three paths in-process**, plus the configured Vercel AI SDK `ToolLoopAgent` protected-tool path. M4 is complete at this execution-boundary level. A malicious host that deliberately exposes a separate unguarded tool or credential remains outside Agent Authority's security boundary.
+The same Task Lease authority model is exercised across all three paths plus the configured Vercel AI SDK protected-tool path. A durable session implements the same `evaluate(runtime, request)` boundary, so persistence changes how task state survives—not the authority model each transport uses.
 
 ## What is implemented
 
@@ -262,18 +286,14 @@ v0.4.4 demonstrates the **same Task Lease and authority fact across all three pa
 - expiry and cumulative budgets
 - delegation attenuation
 - durable mission revocation
-- Task Lease prototype
-- explicit authority roots
+- explicit Task Lease authority roots
 - same-lease provenance-bound derived facts
 - execution evidence binding an allowed receipt, request and exact output hash
-- strict `deriveFromEvidence()` path where the caller cannot provide the authority value
-- reviewed Gmail sender authority extractor bound to `gmail:thread.read`
-- reviewed GitHub selected-issue-number extractor bound to marker-scoped `github:issue.list`
+- strict `deriveFromEvidence()` where the caller cannot provide the authority value
+- reviewed Gmail and GitHub authority extractors
 - shared Google/GitHub authority-extractor conformance suite
 - legacy host-trusted `derive()` compatibility path
-- required parent lineage and extraction selector
-- exact context-field bindings
-- authority-delta step-up signal
+- exact context-field bindings and authority-delta step-up
 - immediate task completion/expiry enforcement
 - Task Lease IDs/hashes in decision receipts
 
@@ -284,15 +304,26 @@ v0.4.4 demonstrates the **same Task Lease and authority fact across all three pa
 - successful guarded effects return separate execution evidence
 - Task-Lease-aware MCP gateway/proxy evaluation
 - Task-Lease-aware brokered execution via `ExecutingAuthorityRuntime.executeTaskLease()`
-- brokered execution evidence bound to Task-Lease receipts
 - SDK/MCP/broker transport-invariance conformance test
 - real Vercel AI SDK `ToolLoopAgent` protected-tool harness proof
 - unmapped executable AI SDK tools fail closed before their effect executes
 - one-time human approvals bound to exact request
-- mutation idempotency
-- conservative uncertain-state handling
-- signed harness action grants
-- MCP v2 read-only gateway/proxy
+- mutation idempotency and conservative uncertain-state handling
+
+### Durability
+
+- Task Lease snapshots bind the exact Mission hash
+- validated Task Lease recovery rejects mission substitution, malformed state and invalid authority lineage
+- HMAC-SHA256-authenticated local snapshots using a purpose-derived key from the Agent Authority master key
+- atomic whole-snapshot replacement
+- local per-lease transaction lock
+- stale-worker compare-and-swap protection
+- changed raw saves cannot silently overwrite newer durable authority
+- transactional root/fact/binding/completion mutations
+- durable completion and expiry across restart
+- `DurableTaskLeaseSession` automatic mutation facade
+- durable session refresh before authority evaluation
+- stale execution-evidence derivation conflicts when lease state changes between read and derive
 
 ### Credentials and runtime
 
@@ -307,15 +338,15 @@ v0.4.4 demonstrates the **same Task Lease and authority fact across all three pa
 
 ### Engineering quality
 
-- adversarial authorization tests
+- adversarial authorization and provenance tests
 - execution-evidence substitution, tampering, replay, cross-lease and selector tests
-- the same provider-derived-authority conformance attacks against Google and GitHub
-- cross-transport invariance test for direct SDK, MCP and brokered execution
-- real AI SDK agent-loop tests for unauthorized, unmapped and completed-lease tool calls with zero underlying effects
+- provider-derived-authority conformance attacks against Google and GitHub
+- transport invariance across direct SDK, MCP and brokered execution
+- real AI SDK agent-loop unauthorized/unmapped/completed tests with zero underlying effects
+- durable restart, tamper, stale-writer, alias, conflict and stale-evidence tests
 - Node 20 and Node 22 CI
-- coverage run
-- package checks
-- clean-consumer npm registry verification
+- coverage and packed-package checks
+- independent clean-consumer npm registry verification
 - live GitHub read and evidence-derived mutation proofs
 - CodeQL
 
@@ -372,13 +403,14 @@ Allow a natural workflow across mail, calendar, CRM and internal systems without
 1. **Task before credential.** A provider token is not task authority.
 2. **Mission is the ceiling.** Task Leases cannot override explicit denies.
 3. **No side effect before authorization.** Denied and step-up actions never execute.
-4. **Authority lineage matters.** Provider-derived authority should bind the exact allowed receipt and guarded output to a reviewed extractor; legacy host-trusted derivation remains identifiable in provenance.
+4. **Authority lineage matters.** Provider-derived authority should bind the exact allowed receipt and guarded output to a reviewed extractor.
 5. **No silent resource expansion.** A different concrete resource becomes an authority delta.
 6. **Task authority ends with the task.** Completion and expiry are independent from provider credential lifetime.
-7. **Authority may shrink, never silently grow.** Delegation and transport changes must preserve non-amplification.
+7. **Authority may shrink, never silently grow.** Delegation, transport and recovery must preserve non-amplification.
 8. **The evaluated request must be the executed request.** Request hashes, grants and idempotency protect the boundary.
-9. **Credentials stay out of model context where Agent Authority owns them.**
-10. **Security gaps are documented, not marketed away.**
+9. **Durable authority is versioned authority.** Stale workers do not get last-writer-wins over newer Task Lease state.
+10. **Credentials stay out of model context where Agent Authority owns them.**
+11. **Security gaps are documented, not marketed away.**
 
 See [SECURITY.md](SECURITY.md).
 
@@ -386,13 +418,15 @@ See [SECURITY.md](SECURITY.md).
 
 This is still a validation implementation.
 
-- Task Lease state is currently process-local.
+- Durable Task Lease persistence is currently a trusted-local-host reference backend using authenticated files and a local filesystem lock; it is not distributed consensus, a remote database protocol, or hostile-host containment.
+- A worker refreshes durable state before evaluation, but another worker can still change the lease after an `ALLOW` decision and before asynchronous remote provider I/O begins. Remote effect + receipt + Task Lease state are not yet one crash-safe distributed transaction.
+- A crashed local worker may leave a per-lease lock directory requiring explicit recovery; Agent Authority does not silently guess that a lock is stale.
 - Transport and harness proofs cover configured Agent Authority execution boundaries, not a malicious host that exposes a separate unguarded tool, credential, shell or network path.
-- `deriveFromEvidence()` proves consistency with the exact output returned through the trusted Agent Authority guard, but the output is not cryptographically attested by Gmail, GitHub, or another remote provider.
+- `deriveFromEvidence()` proves consistency with the exact output returned through the trusted Agent Authority runtime boundary, but the output is not cryptographically attested by Gmail, GitHub, or another remote provider.
 - The legacy `derive()` API remains host-trusted for compatibility; audit provenance distinguishes it from `execution-evidence-v1` derivation.
 - Source-data changes do not yet automatically invalidate already-derived authority facts.
 - Bindings currently target top-level request context fields.
-- Approved authority deltas are surfaced but not automatically applied back into a live lease.
+- Approved authority deltas are surfaced but not automatically applied back into a live durable lease.
 - GitHub token-stdin is a developer bridge, not final browser OAuth onboarding.
 - The encrypted local vault is not an OS keychain/KMS/HSM backend.
 - Remote authenticated deployment and a production approval UX are not complete.
@@ -420,6 +454,7 @@ We especially want:
 - trustworthy operation -> resource-context mappings;
 - Task Lease examples from real workflows;
 - derived-authority / provenance attacks;
+- durable-state and multi-worker attacks;
 - MCP and non-MCP conformance cases;
 - secure persistence and extraction-verification designs that stay simple.
 

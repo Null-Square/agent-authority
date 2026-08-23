@@ -105,32 +105,26 @@ function oneToolCallModel({ toolName, input, callId = 'call-1' }) {
   });
 }
 
-function harnessAgent({ model, tools, finishes }) {
-  return new ToolLoopAgent({
-    model,
-    tools,
-    experimental_onToolCallFinish: async (event) => {
-      finishes.push(event);
-    }
-  });
+function toolErrors(result) {
+  return result.steps.flatMap((step) =>
+    step.content.filter((part) => part.type === 'tool-error')
+  );
 }
 
-function assertFailedToolFinish(finishes, ErrorType, code) {
-  assert.equal(finishes.length, 1);
-  assert.equal(finishes[0].success, false);
-  assert.ok(finishes[0].error instanceof ErrorType);
-  assert.equal(finishes[0].error.code, code);
+function assertHarnessToolError(result, ErrorType, code) {
+  const errors = toolErrors(result);
+  assert.equal(errors.length, 1);
+  assert.ok(errors[0].error instanceof ErrorType);
+  assert.equal(errors[0].error.code, code);
 }
 
 test('current AI SDK ToolLoopAgent executes an authorized tool through Agent Authority', async () => {
   const lease = buildLease();
   const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
   const effects = [];
-  const finishes = [];
   const tools = buildTools({ guard, effects });
 
-  const agent = harnessAgent({
-    finishes,
+  const agent = new ToolLoopAgent({
     tools,
     model: oneToolCallModel({
       toolName: 'commentIssue',
@@ -144,23 +138,20 @@ test('current AI SDK ToolLoopAgent executes an authorized tool through Agent Aut
   const result = await agent.generate({ prompt: 'Comment on the task issue.' });
 
   assert.equal(result.text, 'done');
+  assert.equal(toolErrors(result).length, 0);
   assert.deepEqual(effects, [{
     repository: 'Null-Square/agent-authority',
     issue_number: 9,
     body: 'framework validation'
   }]);
-  assert.equal(finishes.length, 1);
-  assert.equal(finishes[0].success, true);
 });
 
 test('ToolLoopAgent cannot execute an unrelated resource through the protected tool set', async () => {
   const lease = buildLease();
   const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
   const effects = [];
-  const finishes = [];
   const tools = buildTools({ guard, effects });
-  const agent = harnessAgent({
-    finishes,
+  const agent = new ToolLoopAgent({
     tools,
     model: oneToolCallModel({
       toolName: 'commentIssue',
@@ -175,7 +166,7 @@ test('ToolLoopAgent cannot execute an unrelated resource through the protected t
 
   const result = await agent.generate({ prompt: 'Comment on issue 1.' });
   assert.equal(result.text, 'done');
-  assertFailedToolFinish(finishes, AuthorityApprovalRequiredError, 'authority_delta_required');
+  assertHarnessToolError(result, AuthorityApprovalRequiredError, 'authority_delta_required');
   assert.equal(effects.length, 0);
 });
 
@@ -183,7 +174,6 @@ test('ToolLoopAgent cannot execute an unmapped executable tool through the prote
   const lease = buildLease();
   const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
   let effects = 0;
-  const finishes = [];
   const tools = protectAiSdkTools({
     guard,
     tools: {
@@ -194,8 +184,7 @@ test('ToolLoopAgent cannot execute an unmapped executable tool through the prote
       })
     }
   });
-  const agent = harnessAgent({
-    finishes,
+  const agent = new ToolLoopAgent({
     tools,
     model: oneToolCallModel({
       toolName: 'dangerous',
@@ -206,7 +195,7 @@ test('ToolLoopAgent cannot execute an unmapped executable tool through the prote
 
   const result = await agent.generate({ prompt: 'Run the dangerous tool.' });
   assert.equal(result.text, 'done');
-  assertFailedToolFinish(finishes, UnmappedAiSdkToolError, 'ai_sdk_tool_unmapped');
+  assertHarnessToolError(result, UnmappedAiSdkToolError, 'ai_sdk_tool_unmapped');
   assert.equal(effects, 0);
 });
 
@@ -214,12 +203,10 @@ test('ToolLoopAgent cannot reuse a protected tool after Task Lease completion', 
   const lease = buildLease();
   const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
   const effects = [];
-  const finishes = [];
   const tools = buildTools({ guard, effects });
   lease.complete('harness proof complete');
 
-  const agent = harnessAgent({
-    finishes,
+  const agent = new ToolLoopAgent({
     tools,
     model: oneToolCallModel({
       toolName: 'commentIssue',
@@ -234,7 +221,7 @@ test('ToolLoopAgent cannot reuse a protected tool after Task Lease completion', 
 
   const result = await agent.generate({ prompt: 'Comment on the task issue again.' });
   assert.equal(result.text, 'done');
-  assertFailedToolFinish(finishes, AuthorityDeniedError, 'task_lease_completed');
+  assertHarnessToolError(result, AuthorityDeniedError, 'task_lease_completed');
   assert.equal(effects.length, 0);
 });
 

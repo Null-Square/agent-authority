@@ -1,6 +1,12 @@
 import { brokeredProviderAdapter } from '../connections.js';
 
-const MUTATING_ACTIONS = new Set(['issue.create', 'issue.comment', 'pull_request.create', 'repo.contents.write']);
+const MUTATING_ACTIONS = new Set([
+  'issue.create',
+  'issue.comment',
+  'git.ref.create',
+  'pull_request.create',
+  'repo.contents.write'
+]);
 const ISSUE_STATES = new Set(['open', 'closed', 'all']);
 
 function required(value, name) {
@@ -21,12 +27,67 @@ function repoParts(context = {}) {
   return { owner, repo };
 }
 
+function repositoryPath(value, name = 'context.path') {
+  const path = String(required(value, name));
+  if (path.startsWith('/') || path.endsWith('/') || path.includes('\\')) {
+    throw providerError('invalid_repository_path', `${name} must be a relative repository path`);
+  }
+  const segments = path.split('/');
+  if (
+    segments.some((segment) => segment === '' || segment === '.' || segment === '..') ||
+    [...path].some((char) => {
+      const code = char.charCodeAt(0);
+      return code === 0 || code === 127;
+    })
+  ) {
+    throw providerError('invalid_repository_path', `${name} contains an unsafe path segment`);
+  }
+  return path;
+}
+
 function encodedPath(path) {
-  return String(path)
+  return repositoryPath(path)
     .split('/')
-    .filter(Boolean)
     .map(encodeURIComponent)
     .join('/');
+}
+
+function branchName(value, name = 'context.branch') {
+  const branch = String(required(value, name));
+  const segments = branch.split('/');
+  const hasInvalidCharacter = [...branch].some((char) => {
+    const code = char.charCodeAt(0);
+    return code <= 32 || code === 127 || '~^:?*[\\'.includes(char);
+  });
+
+  if (
+    branch.length > 255 ||
+    branch === '@' ||
+    branch.startsWith('/') ||
+    branch.endsWith('/') ||
+    branch.startsWith('.') ||
+    branch.endsWith('.') ||
+    branch.includes('//') ||
+    branch.includes('..') ||
+    branch.includes('@{') ||
+    hasInvalidCharacter ||
+    segments.some((segment) => !segment || segment === '.' || segment === '..' || segment.endsWith('.lock'))
+  ) {
+    throw providerError('invalid_git_branch', `${name} is not a safe Git branch name`);
+  }
+  return branch;
+}
+
+function encodedBranch(value, name = 'context.branch') {
+  return branchName(value, name).split('/').map(encodeURIComponent).join('/');
+}
+
+function gitSha(value, name = 'context.sha') {
+  const sha = String(required(value, name));
+  if (!/^[0-9a-f]{40}$/i.test(sha)) {
+    throw providerError('invalid_git_sha', `${name} must be a 40-character Git SHA`);
+  }
+  return sha.toLowerCase();
 }
 
 function issueNumber(value) {
@@ -59,8 +120,8 @@ function buildOperation(request) {
       return { method: 'GET', path: root };
 
     case 'repo.contents.read': {
-      const path = required(context.path, 'context.path');
-      const query = context.ref ? `?ref=${encodeURIComponent(context.ref)}` : '';
+      const path = repositoryPath(context.path);
+      const query = context.ref ? `?ref=${encodeURIComponent(branchName(context.ref, 'context.ref'))}` : '';
       return { method: 'GET', path: `${root}/contents/${encodedPath(path)}${query}` };
     }
 
@@ -86,21 +147,38 @@ function buildOperation(request) {
         body: { body: required(context.body, 'context.body') }
       };
 
+    case 'git.ref.read': {
+      const branch = encodedBranch(context.branch);
+      return { method: 'GET', path: `${root}/git/ref/heads/${branch}` };
+    }
+
+    case 'git.ref.create': {
+      const branch = branchName(context.branch);
+      return {
+        method: 'POST',
+        path: `${root}/git/refs`,
+        body: {
+          ref: `refs/heads/${branch}`,
+          sha: gitSha(context.sha)
+        }
+      };
+    }
+
     case 'pull_request.create':
       return {
         method: 'POST',
         path: `${root}/pulls`,
         body: {
           title: required(context.title, 'context.title'),
-          head: required(context.head, 'context.head'),
-          base: required(context.base, 'context.base'),
+          head: branchName(context.head, 'context.head'),
+          base: branchName(context.base, 'context.base'),
           body: context.body || undefined,
           draft: Boolean(context.draft)
         }
       };
 
     case 'repo.contents.write': {
-      const path = required(context.path, 'context.path');
+      const path = repositoryPath(context.path);
       const content = required(context.content_base64, 'context.content_base64');
       return {
         method: 'PUT',
@@ -109,7 +187,7 @@ function buildOperation(request) {
           message: required(context.message, 'context.message'),
           content,
           sha: context.sha || undefined,
-          branch: context.branch || undefined
+          branch: context.branch ? branchName(context.branch) : undefined
         }
       };
     }
@@ -158,6 +236,40 @@ function normalizeIssueList(request, body) {
   };
 }
 
+function normalizeGitRef(request, body) {
+  const expectedBranch = branchName(request.context?.branch);
+  const ref = typeof body?.ref === 'string' ? body.ref : null;
+  const expectedRef = `refs/heads/${expectedBranch}`;
+  if (ref !== expectedRef) {
+    throw providerError('github_git_ref_invalid', `GitHub ${request.action} response did not match requested branch`);
+  }
+  return {
+    branch: expectedBranch,
+    ref,
+    sha: gitSha(body?.object?.sha, 'provider git ref sha')
+  };
+}
+
+function normalizePullRequest(request, body) {
+  const number = issueNumber(body?.number);
+  const head = typeof body?.head?.ref === 'string'
+    ? branchName(body.head.ref, 'provider pull request head')
+    : branchName(request.context?.head, 'context.head');
+  const base = typeof body?.base?.ref === 'string'
+    ? branchName(body.base.ref, 'provider pull request base')
+    : branchName(request.context?.base, 'context.base');
+  if (head !== branchName(request.context?.head, 'context.head') || base !== branchName(request.context?.base, 'context.base')) {
+    throw providerError('github_pull_request_invalid', 'GitHub pull request response did not match requested head/base');
+  }
+  return {
+    pull_request_number: number,
+    html_url: body?.html_url || null,
+    head,
+    base,
+    draft: Boolean(body?.draft)
+  };
+}
+
 function normalizedOutput(request, response, body) {
   const common = {
     provider: 'github',
@@ -177,6 +289,14 @@ function normalizedOutput(request, response, body) {
       html_url: body?.html_url || null,
       issue_number: issueNumber(request.context?.issue_number)
     };
+  }
+
+  if (request.action === 'git.ref.read' || request.action === 'git.ref.create') {
+    return { ...common, ...normalizeGitRef(request, body) };
+  }
+
+  if (request.action === 'pull_request.create') {
+    return { ...common, ...normalizePullRequest(request, body) };
   }
 
   return { ...common, body: sanitizeBody(body) };
@@ -210,6 +330,49 @@ export function githubIssueListSelectedNumberAuthorityExtractor({ receipt, outpu
   return {
     extractor_id: 'github.issue.list.selected-number.v1',
     selector: 'output.selected_issue_number'
+  };
+}
+
+/**
+ * Reviewed extractor for the exact commit SHA returned by a guarded Git ref read.
+ */
+export function githubGitRefShaAuthorityExtractor({ receipt, output } = {}) {
+  if (receipt?.service !== 'github' || receipt?.action !== 'git.ref.read') {
+    throw providerError(
+      'trusted_extractor_operation_mismatch',
+      'GitHub ref SHA authority extractor only accepts github:git.ref.read receipts'
+    );
+  }
+  if (output?.provider !== 'github') {
+    throw providerError('trusted_extractor_output_invalid', 'normalized GitHub ref output is required');
+  }
+  gitSha(output.sha, 'normalized GitHub ref sha');
+  branchName(output.branch, 'normalized GitHub ref branch');
+  return {
+    extractor_id: 'github.git.ref.sha.v1',
+    selector: 'output.sha'
+  };
+}
+
+/**
+ * Reviewed extractor for the exact PR number created by a guarded GitHub request.
+ */
+export function githubPullRequestCreateNumberAuthorityExtractor({ receipt, output } = {}) {
+  if (receipt?.service !== 'github' || receipt?.action !== 'pull_request.create') {
+    throw providerError(
+      'trusted_extractor_operation_mismatch',
+      'GitHub PR-number authority extractor only accepts github:pull_request.create receipts'
+    );
+  }
+  if (output?.provider !== 'github') {
+    throw providerError('trusted_extractor_output_invalid', 'normalized GitHub pull request output is required');
+  }
+  issueNumber(output.pull_request_number);
+  branchName(output.head, 'normalized GitHub pull request head');
+  branchName(output.base, 'normalized GitHub pull request base');
+  return {
+    extractor_id: 'github.pull-request.create.number.v1',
+    selector: 'output.pull_request_number'
   };
 }
 
@@ -272,6 +435,12 @@ export function createGitHubProviderAdapter({ broker, fetchImpl = globalThis.fet
       request.context.fixture_marker.trim() !== ''
     ) {
       return githubIssueListSelectedNumberAuthorityExtractor;
+    }
+    if (request?.service === 'github' && request?.action === 'git.ref.read' && kind === 'github.git.sha') {
+      return githubGitRefShaAuthorityExtractor;
+    }
+    if (request?.service === 'github' && request?.action === 'pull_request.create' && kind === 'github.pull_request.number') {
+      return githubPullRequestCreateNumberAuthorityExtractor;
     }
     return null;
   };

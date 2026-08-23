@@ -4,7 +4,11 @@ import { ToolLoopAgent, tool } from 'ai';
 import { MockLanguageModelV3 } from 'ai/test';
 import { z } from 'zod';
 import { AuthorityRuntime } from '../../src/index.js';
-import { createTaskLeaseGuard, AuthorityApprovalRequiredError } from '../../src/guard.js';
+import {
+  createTaskLeaseGuard,
+  AuthorityApprovalRequiredError,
+  AuthorityDeniedError
+} from '../../src/guard.js';
 import { protectAiSdkTools, UnmappedAiSdkToolError } from '../../src/integrations/ai-sdk.js';
 import { createTaskLease } from '../../src/task-lease.js';
 
@@ -72,14 +76,9 @@ function buildTools({ guard, effects }) {
   });
 }
 
-test('current AI SDK ToolLoopAgent executes an authorized tool through Agent Authority', async () => {
-  const lease = buildLease();
-  const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
-  const effects = [];
-  const tools = buildTools({ guard, effects });
+function oneToolCallModel({ toolName, input, callId = 'call-1' }) {
   let step = 0;
-
-  const model = new MockLanguageModelV3({
+  return new MockLanguageModelV3({
     doGenerate: async () => {
       step += 1;
       if (step === 1) {
@@ -90,13 +89,9 @@ test('current AI SDK ToolLoopAgent executes an authorized tool through Agent Aut
           content: [{
             type: 'tool-call',
             toolCallType: 'function',
-            toolCallId: 'call-1',
-            toolName: 'commentIssue',
-            input: JSON.stringify({
-              repository: 'Null-Square/agent-authority',
-              issue_number: 9,
-              body: 'framework validation'
-            })
+            toolCallId: callId,
+            toolName,
+            input: JSON.stringify(input)
           }]
         };
       }
@@ -108,11 +103,42 @@ test('current AI SDK ToolLoopAgent executes an authorized tool through Agent Aut
       };
     }
   });
+}
 
-  const agent = new ToolLoopAgent({ model, tools });
+function toolErrors(result) {
+  return result.steps.flatMap((step) =>
+    step.content.filter((part) => part.type === 'tool-error')
+  );
+}
+
+function assertHarnessToolError(result, ErrorType, code) {
+  const errors = toolErrors(result);
+  assert.equal(errors.length, 1);
+  assert.ok(errors[0].error instanceof ErrorType);
+  assert.equal(errors[0].error.code, code);
+}
+
+test('current AI SDK ToolLoopAgent executes an authorized tool through Agent Authority', async () => {
+  const lease = buildLease();
+  const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
+  const effects = [];
+  const tools = buildTools({ guard, effects });
+
+  const agent = new ToolLoopAgent({
+    tools,
+    model: oneToolCallModel({
+      toolName: 'commentIssue',
+      input: {
+        repository: 'Null-Square/agent-authority',
+        issue_number: 9,
+        body: 'framework validation'
+      }
+    })
+  });
   const result = await agent.generate({ prompt: 'Comment on the task issue.' });
 
   assert.equal(result.text, 'done');
+  assert.equal(toolErrors(result).length, 0);
   assert.deepEqual(effects, [{
     repository: 'Null-Square/agent-authority',
     issue_number: 9,
@@ -120,7 +146,86 @@ test('current AI SDK ToolLoopAgent executes an authorized tool through Agent Aut
   }]);
 });
 
-test('AI SDK tool execution cannot silently expand to another resource', async () => {
+test('ToolLoopAgent cannot execute an unrelated resource through the protected tool set', async () => {
+  const lease = buildLease();
+  const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
+  const effects = [];
+  const tools = buildTools({ guard, effects });
+  const agent = new ToolLoopAgent({
+    tools,
+    model: oneToolCallModel({
+      toolName: 'commentIssue',
+      input: {
+        repository: 'Null-Square/agent-authority',
+        issue_number: 1,
+        body: 'must not execute'
+      },
+      callId: 'blocked-resource'
+    })
+  });
+
+  const result = await agent.generate({ prompt: 'Comment on issue 1.' });
+  assert.equal(result.text, 'done');
+  assertHarnessToolError(result, AuthorityApprovalRequiredError, 'authority_delta_required');
+  assert.equal(effects.length, 0);
+});
+
+test('ToolLoopAgent cannot execute an unmapped executable tool through the protected tool set', async () => {
+  const lease = buildLease();
+  const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
+  let effects = 0;
+  const tools = protectAiSdkTools({
+    guard,
+    tools: {
+      dangerous: tool({
+        description: 'An executable tool with no authority mapping',
+        inputSchema: z.object({}),
+        execute: async () => { effects += 1; return 'ran'; }
+      })
+    }
+  });
+  const agent = new ToolLoopAgent({
+    tools,
+    model: oneToolCallModel({
+      toolName: 'dangerous',
+      input: {},
+      callId: 'unmapped-through-agent'
+    })
+  });
+
+  const result = await agent.generate({ prompt: 'Run the dangerous tool.' });
+  assert.equal(result.text, 'done');
+  assertHarnessToolError(result, UnmappedAiSdkToolError, 'ai_sdk_tool_unmapped');
+  assert.equal(effects, 0);
+});
+
+test('ToolLoopAgent cannot reuse a protected tool after Task Lease completion', async () => {
+  const lease = buildLease();
+  const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
+  const effects = [];
+  const tools = buildTools({ guard, effects });
+  lease.complete('harness proof complete');
+
+  const agent = new ToolLoopAgent({
+    tools,
+    model: oneToolCallModel({
+      toolName: 'commentIssue',
+      input: {
+        repository: 'Null-Square/agent-authority',
+        issue_number: 9,
+        body: 'must not execute after completion'
+      },
+      callId: 'completed-lease'
+    })
+  });
+
+  const result = await agent.generate({ prompt: 'Comment on the task issue again.' });
+  assert.equal(result.text, 'done');
+  assertHarnessToolError(result, AuthorityDeniedError, 'task_lease_completed');
+  assert.equal(effects.length, 0);
+});
+
+test('AI SDK protected tool direct execution also cannot silently expand to another resource', async () => {
   const lease = buildLease();
   const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
   const effects = [];
@@ -138,7 +243,7 @@ test('AI SDK tool execution cannot silently expand to another resource', async (
   assert.equal(effects.length, 0);
 });
 
-test('unmapped executable AI SDK tools fail closed', async () => {
+test('unmapped executable AI SDK tools fail closed on direct execution too', async () => {
   const lease = buildLease();
   const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
   let effects = 0;

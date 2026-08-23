@@ -97,21 +97,25 @@ Do **not** build a general semantic policy language unless real integrations req
 
 **Success criterion:** provider-derived authority cannot be established through the strict path unless the exact guarded output, ALLOW receipt and reviewed extractor contract agree on the selected value. This behavior is now exercised across two provider mappings. Stronger provider attestation and source invalidation remain separate follow-on problems.
 
-## M4 — Same task, multiple transports — first proof established
+## M4 — Same task, multiple transports — complete
 
 Prove Agent Authority is not an MCP product or SDK wrapper.
 
 - [x] same Task Lease through ordinary `guard.run()` SDK call
 - [x] same Task Lease through MCP gateway
 - [x] same Task Lease through brokered provider execution
-- [ ] at least one non-bypassable harness/tool-middleware integration
+- [x] at least one harness/tool-middleware integration whose configured executable tool path cannot bypass the Task Lease
 - [x] interoperability test vectors across transports
 
 `test/transport-invariance.test.js` establishes one `execution-evidence-v1` derived fact from brokered execution, then reuses that exact Task Lease and fact through direct SDK, MCP and brokered execution. The three paths produce the same `allow`, `authority_delta_required` and `task_lease_completed` outcomes, and blocked attempts execute zero host callbacks, MCP upstream calls or brokered provider operations.
 
+`test/integrations/ai-sdk.integration.mjs` drives the real Vercel AI SDK `ToolLoopAgent` through the protected tool set. An authorized task-bound tool executes once; an unrelated resource, an executable tool with no Agent Authority mapping, and a completed Task Lease are surfaced by the harness as `tool-error` results while the underlying side-effect counters remain zero. This proves the configured AI SDK tool execution path cannot silently bypass the Task Lease.
+
+The harness claim is intentionally bounded: a malicious host that deliberately gives the model a separate unguarded executable channel remains outside Agent Authority's enforcement boundary.
+
 Brokered Task Lease execution deliberately does not consume mission-level one-time approval to override a lease-level authority delta. Updating a live Task Lease after explicit approval remains separate M2 work.
 
-**Success criterion:** changing transport or harness does not expand the task's authority. The SDK/MCP/broker portion is now demonstrated in-process; an external non-bypassable harness/tool-middleware integration remains the final M4 proof.
+**Success criterion:** changing transport or the configured harness execution path does not expand the task's authority. This is now demonstrated across direct SDK, MCP, brokered execution and the Vercel AI SDK `ToolLoopAgent` protected-tool path.
 
 ## M5 — Production credential and approval UX
 
@@ -161,4 +165,4 @@ Only after operational evidence.
 2. How should an approved authority delta update a running task without opening a broader wildcard permission?
 3. How should source-data changes invalidate downstream derived authority?
 4. What provider/tool metadata is required to map operations to resource context reliably?
-5. Can the same non-amplification conformance suite work across SDK, MCP, CLI and brokered execution?
+5. How should transport invariance be preserved when Task Leases become durable and move across processes or hosts?

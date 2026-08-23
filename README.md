@@ -10,7 +10,7 @@
 
 [Task Leases](docs/task-leases.md) · [Executable evidence](docs/evidence.md) · [Extractor conformance](docs/authority-extractor-conformance.md) · [Transport invariance](docs/transport-invariance.md) · [Google proof](docs/live-google-validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-> **Status: public pre-alpha / v0.4.4 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype, execution-bound derived facts, reviewed Google and GitHub authority extractors, two-provider conformance tests, Task-Lease-aware SDK/MCP/broker execution, approvals, revocation, idempotency, credential isolation, live GitHub proofs, CI and CodeQL. It is not production-ready yet.
+> **Status: public pre-alpha / v0.4.4 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype, execution-bound derived facts, reviewed Google and GitHub authority extractors, two-provider conformance tests, Task-Lease-aware SDK/MCP/broker execution, a real Vercel AI SDK harness proof, approvals, revocation, idempotency, credential isolation, live GitHub proofs, CI and CodeQL. It is not production-ready yet.
 
 </div>
 
@@ -162,7 +162,7 @@ The repository also includes a real Gmail → Calendar validation path and a reu
 
 v0.4.3 applied the **same evidence-derived authority primitive to GitHub**: a root-bound repository + fixture marker are used by the reviewed GitHub adapter to select one issue from a real `issue.list` response; `deriveFromEvidence()` establishes that exact issue number as downstream authority; one real comment mutation succeeds; unrelated and post-completion issue mutations never reach the provider. Google and GitHub are exercised by the same [authority extractor conformance contract](docs/authority-extractor-conformance.md).
 
-v0.4.4 adds the first **transport-invariance proof**: one `execution-evidence-v1` derived fact is established under one Task Lease, then that exact lease and fact constrain ordinary `guard.run()`, the MCP gateway and brokered provider execution. The same allowed resource succeeds, an unrelated resource produces `authority_delta_required` with zero blocked callbacks/provider calls, and task completion produces `task_lease_completed` across all three paths. See [Task Lease transport invariance](docs/transport-invariance.md).
+v0.4.4 adds the **transport-invariance proof**: one `execution-evidence-v1` derived fact is established under one Task Lease, then that exact lease and fact constrain ordinary `guard.run()`, the MCP gateway and brokered provider execution. The same allowed resource succeeds, an unrelated resource produces `authority_delta_required` with zero blocked callbacks/provider calls, and task completion produces `task_lease_completed` across all three paths. The repository also drives a real Vercel AI SDK `ToolLoopAgent` through `protectAiSdkTools()`: unrelated resources, unmapped executable tools and completed leases are surfaced as tool errors while the underlying side-effect counters remain zero. See [Task Lease transport invariance](docs/transport-invariance.md).
 
 ## Minimal developer API
 
@@ -250,7 +250,7 @@ agent -> Agent Authority -> isolated credential -> provider
 
 Best when the agent should not receive the provider credential at all.
 
-v0.4.4 demonstrates the **same Task Lease and authority fact across all three paths in-process**. The remaining M4 target is a real non-bypassable external harness/tool-middleware integration.
+v0.4.4 demonstrates the **same Task Lease and authority fact across all three paths in-process**, plus the configured Vercel AI SDK `ToolLoopAgent` protected-tool path. M4 is complete at this execution-boundary level. A malicious host that deliberately exposes a separate unguarded tool or credential remains outside Agent Authority's security boundary.
 
 ## What is implemented
 
@@ -286,6 +286,8 @@ v0.4.4 demonstrates the **same Task Lease and authority fact across all three pa
 - Task-Lease-aware brokered execution via `ExecutingAuthorityRuntime.executeTaskLease()`
 - brokered execution evidence bound to Task-Lease receipts
 - SDK/MCP/broker transport-invariance conformance test
+- real Vercel AI SDK `ToolLoopAgent` protected-tool harness proof
+- unmapped executable AI SDK tools fail closed before their effect executes
 - one-time human approvals bound to exact request
 - mutation idempotency
 - conservative uncertain-state handling
@@ -309,6 +311,7 @@ v0.4.4 demonstrates the **same Task Lease and authority fact across all three pa
 - execution-evidence substitution, tampering, replay, cross-lease and selector tests
 - the same provider-derived-authority conformance attacks against Google and GitHub
 - cross-transport invariance test for direct SDK, MCP and brokered execution
+- real AI SDK agent-loop tests for unauthorized, unmapped and completed-lease tool calls with zero underlying effects
 - Node 20 and Node 22 CI
 - coverage run
 - package checks
@@ -384,7 +387,7 @@ See [SECURITY.md](SECURITY.md).
 This is still a validation implementation.
 
 - Task Lease state is currently process-local.
-- The SDK/MCP/broker transport-invariance proof is currently in-process; a real external non-bypassable harness/tool-middleware integration remains open.
+- Transport and harness proofs cover configured Agent Authority execution boundaries, not a malicious host that exposes a separate unguarded tool, credential, shell or network path.
 - `deriveFromEvidence()` proves consistency with the exact output returned through the trusted Agent Authority guard, but the output is not cryptographically attested by Gmail, GitHub, or another remote provider.
 - The legacy `derive()` API remains host-trusted for compatibility; audit provenance distinguishes it from `execution-evidence-v1` derivation.
 - Source-data changes do not yet automatically invalidate already-derived authority facts.

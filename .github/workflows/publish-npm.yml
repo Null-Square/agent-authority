@@ -31,6 +31,7 @@ jobs:
           npm test
           npm run test:ai-sdk
           npm run demo:task
+          npm run demo:task-coding
           npm run benchmark:task
           npm run demo:task-lease
           npm run check:syntax
@@ -84,6 +85,7 @@ jobs:
           CONSUMER="$(mktemp -d)"
           cp test/consumer/package-smoke.mjs "$CONSUMER/package-smoke.mjs"
           cp test/consumer/connected-smoke.mjs "$CONSUMER/connected-smoke.mjs"
+          cp test/consumer/coding-smoke.mjs "$CONSUMER/coding-smoke.mjs"
           cd "$CONSUMER"
           npm init -y >/dev/null
           npm install "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" --ignore-scripts
@@ -93,3 +95,4 @@ jobs:
           fi
           node package-smoke.mjs
           node connected-smoke.mjs
+          node coding-smoke.mjs

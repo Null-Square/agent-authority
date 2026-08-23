@@ -41,7 +41,7 @@
     "test": "node --test test/*.test.js",
     "test:ai-sdk": "node --test test/integrations/ai-sdk.integration.mjs",
     "test:coverage": "node --experimental-test-coverage --test test/*.test.js",
-    "check:syntax": "node --check src/index.js && node --check src/authority-evidence.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/providers/google.js && node --check src/storage.js && node --check src/runtime-env.js && node --check src/sdk.js && node --check src/server.js && node --check src/cli.js && node --check src/agent-auth.js && node --check src/approvals.js && node --check src/idempotency.js && node --check src/keys.js && node --check src/harness-bridge.js && node --check src/guard.js && node --check src/task-lease.js && node --check src/mcp-gateway.js && node --check src/mcp-remote.js && node --check src/mcp-server.js && node --check src/integrations/ai-sdk.js && node --check examples/validation-mcp-upstream.js && node --check examples/direct-guard.js && node --check examples/task-lease-demo.js && node --check examples/live-github-task-lease.js && node --check examples/live-github-derived-mutation.js && node --check examples/live-google-cross-provider.js",
+    "check:syntax": "node --check src/index.js && node --check src/authority-evidence.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/providers/google.js && node --check src/storage.js && node --check src/durable-task-lease.js && node --check src/runtime-env.js && node --check src/sdk.js && node --check src/server.js && node --check src/cli.js && node --check src/agent-auth.js && node --check src/approvals.js && node --check src/idempotency.js && node --check src/keys.js && node --check src/harness-bridge.js && node --check src/guard.js && node --check src/task-lease.js && node --check src/mcp-gateway.js && node --check src/mcp-remote.js && node --check src/mcp-server.js && node --check src/integrations/ai-sdk.js && node --check examples/validation-mcp-upstream.js && node --check examples/direct-guard.js && node --check examples/task-lease-demo.js && node --check examples/live-github-task-lease.js && node --check examples/live-github-derived-mutation.js && node --check examples/live-google-cross-provider.js",
     "check:package": "npm pack --dry-run",
     "check": "npm run check:syntax && npm test && npm run demo:task-lease && npm run check:package"
   },
@@ -62,6 +62,7 @@
     "./approvals": "./src/approvals.js",
     "./authority-evidence": "./src/authority-evidence.js",
     "./connections": "./src/connections.js",
+    "./durable-task-lease": "./src/durable-task-lease.js",
     "./execution": "./src/execution.js",
     "./guard": "./src/guard.js",
     "./harness-bridge": "./src/harness-bridge.js",

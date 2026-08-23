@@ -1,8 +1,8 @@
-# v0.4.7 connected-execution candidate
+# v0.4.7 connected execution
 
-This candidate closes a concrete adoption gap between the task-first API and the existing credential broker/provider runtime.
+v0.4.7 closes a concrete adoption gap between the task-first API and the existing credential broker/provider runtime.
 
-## Candidate changes
+## What shipped
 
 - `task.execute(request)` executes through an `ExecutingAuthorityRuntime` while preserving the current Task Lease as the narrowest authority object.
 - connected deny/step-up outcomes use the same public error classes as `task.run()`.
@@ -11,19 +11,28 @@ This candidate closes a concrete adoption gap between the task-first API and the
 - a sole active provider account can be resolved when requests omit `account_id`; multiple active accounts remain ambiguous and fail closed.
 - default disconnect can remove that sole connection without requiring the caller to know an auto-detected provider account ID.
 - the connected GitHub quickstart proves the local encrypted vault + credential broker + live provider path without copying credentials into task/model context.
+- the CLI version is now derived from `package.json` instead of a stale hard-coded constant.
 
 ## Security boundary
 
-This does not create a GitHub token, OAuth flow, GitHub App, KMS, or new identity format. Provider-side least privilege still comes from GitHub. Agent Authority adds a task boundary underneath that connected account authority.
+This release does not create a GitHub token, OAuth flow, GitHub App, KMS, or new identity format. Provider-side least privilege still comes from GitHub. Agent Authority adds a task boundary underneath that connected account authority.
 
 The local encrypted vault remains a trusted-local-host developer reference backend.
 
-## Release gate
+## Release evidence
 
-Before version publication:
+The exact v0.4.7 candidate passed:
 
-- unit/adversarial tests must prove credential isolation and zero provider execution on task authority delta;
-- packed consumer must import and execute the new public surfaces;
-- live connected GitHub workflow must pass through the encrypted local runtime;
-- Node 20/22, coverage, AI SDK, existing live GitHub proofs and CodeQL must remain green;
-- registry verification must be performed after npm publication before the public release marker is updated.
+- Node 20 and Node 22 test lanes;
+- coverage;
+- packed-package consumer smoke;
+- connected-execution packed consumer smoke;
+- Vercel AI SDK integration;
+- live GitHub read proof;
+- live evidence-derived GitHub mutation proof;
+- encrypted connected-GitHub onboarding proof;
+- CodeQL.
+
+After merge, the independent `Verify npm registry` workflow resolved version `0.4.7`, confirmed it was visible on npm, installed that exact registry artifact into a fresh Node 20 consumer, confirmed the optional AI SDK was absent, and successfully ran both the ordinary public package smoke and the connected-execution smoke.
+
+That registry proof is the basis for marking v0.4.7 published.

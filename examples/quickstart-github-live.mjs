@@ -10,9 +10,11 @@ const task = createTask({
   request: `Inspect only ${allowedRepository}`,
   permissions: {
     github: {
+      // Model the standing account/app capability as broader than this task.
+      // The Task authority root below narrows repo.read to one repository.
       allow: ['repo.read'],
       deny: ['repo.write', 'repo.delete'],
-      constraints: { repository: [allowedRepository] }
+      constraints: {}
     }
   },
   authority: {
@@ -56,6 +58,7 @@ async function readRepository(repository) {
   });
 }
 
+console.log(`Standing GitHub permission -> repo.read`);
 console.log(`Task authority -> ${allowedRepository}`);
 console.log(`GitHub mode -> ${process.env.GITHUB_TOKEN ? 'authenticated token' : 'public API; no credential required'}`);
 
@@ -78,4 +81,4 @@ if (outboundCalls !== 1) {
 }
 
 task.complete('live GitHub quickstart complete');
-console.log('PASS -> unrelated repository was blocked before fetch()');
+console.log('PASS -> broader standing repo.read permission could not reach an unrelated repository for this task');

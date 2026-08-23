@@ -39,15 +39,18 @@ The engine has enough depth to test whether developers actually want this layer.
 - [x] deterministic utility regression benchmark
 - [x] first live provider proof through task-first API: GitHub issue discovery -> exact issue comment
 - [x] self-contained support/communications proof: Gmail thread -> exact Calendar attendee
+- [x] self-contained operations/finance proof: ticket -> order -> payment -> exact full refund
 - [ ] coding workflow: issue -> branch -> files -> PR, with merge/deploy outside authority
 - [ ] support/communications expansion: customer -> meeting + reply/CRM, or live task-first Google Actions proof
-- [ ] operations/finance workflow: ticket -> order -> payment -> bounded refund
+- [ ] bounded finance refund: derived payment amount can authorize a smaller refund without authorizing an over-refund
 - [ ] first-time developer can complete a meaningful integration in under 10 minutes
 - [ ] at least one external developer adopts the package without project-author assistance
 
 The live GitHub task-first proof selected issue #9 through the reviewed provider mapping, established that issue through `task.authorityFrom()`, executed exactly one real comment mutation, blocked unrelated issue #1 with `authority_delta_required`, surfaced the established-vs-requested explanation, denied the same issue after task completion, and observed `reads=1` / `task_mutations=1` before cleanup.
 
 The support/communications proof uses the same task-first API across Gmail and Calendar: one authorized `thread_id` establishes one canonical `sender_email` through the reviewed Google extractor; only that attendee can be used for the task-bound Calendar event, while another thread or attendee executes zero provider-shaped callbacks. The example mirrors the real Google adapter contract but does not replace the still-open public Google Actions evidence gate.
+
+The operations/finance proof keeps one evidence-derived chain from support ticket -> order -> payment -> exact refund. The exact payment ID, amount in minor units, and currency are all bound before the refund callback can execute. Unrelated payment, over-refund, wrong currency, partial refund under the current equality model, and post-completion refund all execute zero additional refund callbacks. This proof exposed a deliberate product gap: current bindings are exact equality, so a legitimate partial refund also steps up. Do not add a general expression language; add a narrow derived numeric ceiling only when real workflow/adoption evidence shows partial refunds are required.
 
 Current utility regression metrics:
 

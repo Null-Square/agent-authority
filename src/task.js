@@ -2,7 +2,11 @@ import { randomUUID } from 'node:crypto';
 
 import { AuthorityRuntime } from './index.js';
 import { createTaskLease } from './task-lease.js';
-import { createTaskLeaseGuard } from './guard.js';
+import {
+  AuthorityApprovalRequiredError,
+  AuthorityDeniedError,
+  createTaskLeaseGuard
+} from './guard.js';
 import { createDurableTaskLeaseSession } from './durable-task-lease.js';
 
 function requiredString(value, label) {
@@ -113,13 +117,32 @@ function resultFrom(value) {
   return null;
 }
 
+function assertAllowedExecution(execution) {
+  const decision = execution?.result?.decision;
+  if (decision === 'deny') throw new AuthorityDeniedError(execution);
+  if (decision === 'require_approval') throw new AuthorityApprovalRequiredError(execution);
+  if (decision !== 'allow') {
+    throw new AuthorityDeniedError({
+      ...execution,
+      result: {
+        ...(execution?.result || {}),
+        decision: 'deny',
+        code: 'unknown_decision',
+        reason: 'authority returned an unsupported decision'
+      }
+    });
+  }
+  return execution;
+}
+
 /**
  * Product-facing task authority facade.
  *
  * It intentionally does not replace Mission/TaskLease. It composes those
  * primitives into the small surface most agent developers need: run an effect,
- * derive named authority from guarded output, bind that authority to later
- * effects, explain step-up decisions, and complete the task.
+ * execute through a connected provider, derive named authority from guarded
+ * output, bind that authority to later effects, explain step-up decisions, and
+ * complete the task.
  */
 export class AgentTask {
   constructor({ lease, runtime = new AuthorityRuntime() } = {}) {
@@ -134,13 +157,31 @@ export class AgentTask {
   get status() { return this._lease.status; }
   get mission() { return structuredClone(this._lease.mission); }
 
+  /**
+   * Guard an application-owned effect callback.
+   */
   run(request, effect) {
     return this.guard.run(request, effect);
   }
 
+  /**
+   * Execute through an Agent Authority connected-provider runtime.
+   *
+   * Credentials remain inside the runtime/broker. The caller receives only the
+   * sanitized provider output, ALLOW receipt and execution evidence. Deny and
+   * step-up decisions use the same public error classes as run().
+   */
+  async execute(request) {
+    if (typeof this.runtime.executeTaskLease !== 'function') {
+      throw new Error('task runtime does not support connected provider execution');
+    }
+    const execution = await this.runtime.executeTaskLease(this._lease, request);
+    return assertAllowedExecution(execution);
+  }
+
   authorityFrom(execution, { name, fact_id, kind = 'opaque', from = [], extractor } = {}) {
     if (!execution?.receipt || !execution?.evidence || !Object.hasOwn(execution, 'output')) {
-      throw new Error('authorityFrom() requires the result returned by task.run()');
+      throw new Error('authorityFrom() requires the result returned by task.run() or task.execute()');
     }
     const parents = Array.isArray(from) ? from : [from];
     return this._lease.deriveFromEvidence({

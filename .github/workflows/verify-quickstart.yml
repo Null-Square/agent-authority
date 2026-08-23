@@ -1,0 +1,44 @@
+name: Verify fresh-install quickstart
+
+on:
+  pull_request:
+    paths:
+      - examples/quickstart.mjs
+      - docs/quickstart.md
+      - README.md
+      - ROADMAP.md
+      - .github/workflows/verify-quickstart.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Install latest public package in a blank project and run the quickstart
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(npm view @nullsquare/agent-authority version)"
+          CONSUMER="$(mktemp -d)"
+          cp "$GITHUB_WORKSPACE/examples/quickstart.mjs" "$CONSUMER/quickstart.mjs"
+          cd "$CONSUMER"
+          npm init -y >/dev/null
+          npm install "@nullsquare/agent-authority@$VERSION" --ignore-scripts
+
+          if npm ls ai --all >/dev/null 2>&1; then
+            echo "FAIL -> quickstart unexpectedly installed optional AI SDK"
+            exit 1
+          fi
+
+          echo "Fresh-install quickstart against @nullsquare/agent-authority@$VERSION"
+          node quickstart.mjs

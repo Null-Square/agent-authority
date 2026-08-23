@@ -116,8 +116,19 @@ export class CredentialBroker {
     return connection;
   }
 
+  resolveConnection({ principal_id, service, account_id = 'default' }) {
+    const exact = this.connections.get({ principal_id, service, account_id });
+    if (exact) return exact;
+    if (account_id !== 'default') return null;
+
+    const candidates = this.connections.list(principal_id)
+      .filter((connection) => connection.service === service && connection.status === 'active');
+
+    return candidates.length === 1 ? candidates[0] : null;
+  }
+
   getConnection({ principal_id, service, account_id = 'default' }) {
-    return this.connections.get({ principal_id, service, account_id });
+    return this.resolveConnection({ principal_id, service, account_id });
   }
 
   listConnections(principal_id) {
@@ -125,7 +136,7 @@ export class CredentialBroker {
   }
 
   resolveInternal({ principal_id, service, account_id = 'default' }) {
-    const connection = this.connections.get({ principal_id, service, account_id });
+    const connection = this.resolveConnection({ principal_id, service, account_id });
     if (!connection || connection.status !== 'active') {
       const error = new Error(`no active ${service} connection for this principal`);
       error.code = 'connection_required';
@@ -139,10 +150,14 @@ export class CredentialBroker {
   }
 
   disconnect({ principal_id, service, account_id = 'default' }) {
-    const current = this.connections.get({ principal_id, service, account_id });
+    const current = this.resolveConnection({ principal_id, service, account_id });
     if (!current) return null;
     this.secrets.delete(current.credential_ref);
-    const connection = this.connections.disconnect({ principal_id, service, account_id });
+    const connection = this.connections.disconnect({
+      principal_id,
+      service,
+      account_id: current.account_id
+    });
     if (!connection) return null;
     const { credential_ref, ...safe } = connection;
     return safe;

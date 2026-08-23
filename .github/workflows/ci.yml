@@ -59,6 +59,7 @@ jobs:
           ROOT="$PWD"
           CONSUMER="$(mktemp -d)"
           cp test/consumer/package-smoke.mjs "$CONSUMER/package-smoke.mjs"
+          cp test/consumer/connected-smoke.mjs "$CONSUMER/connected-smoke.mjs"
           cd "$CONSUMER"
           npm init -y >/dev/null
           npm install "$ROOT/$TARBALL" --ignore-scripts
@@ -67,6 +68,7 @@ jobs:
             exit 1
           fi
           node package-smoke.mjs
+          node connected-smoke.mjs
 
   ai-sdk-integration:
     runs-on: ubuntu-latest

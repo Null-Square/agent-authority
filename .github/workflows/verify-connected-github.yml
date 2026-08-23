@@ -1,0 +1,77 @@
+name: Verify connected GitHub quickstart
+
+on:
+  pull_request:
+    paths:
+      - src/task.js
+      - src/connections.js
+      - src/runtime-env.js
+      - src/providers/github.js
+      - src/execution.js
+      - src/cli.js
+      - package.json
+      - examples/quickstart-github-connected.mjs
+      - test/task-connected-execution.test.js
+      - .github/workflows/verify-connected-github.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  connected-github:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Pack candidate
+        id: pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts
+          filename=$(npm pack --silent)
+          echo "filename=$filename" >> "$GITHUB_OUTPUT"
+
+      - name: Install candidate, connect GitHub, and execute one bounded task
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CONSUMER="$(mktemp -d)"
+          AA_HOME="$(mktemp -d)"
+          cp "$GITHUB_WORKSPACE/${{ steps.pack.outputs.filename }}" "$CONSUMER/package.tgz"
+          cp "$GITHUB_WORKSPACE/examples/quickstart-github-connected.mjs" "$CONSUMER/quickstart-github-connected.mjs"
+          cd "$CONSUMER"
+          npm init -y >/dev/null
+          npm install ./package.tgz --ignore-scripts
+
+          npx agent-authority setup --home "$AA_HOME"
+          printf %s "$GITHUB_TOKEN" | npx agent-authority connect github --token-stdin --no-verify --home "$AA_HOME"
+
+          connections=$(npx agent-authority connections --home "$AA_HOME")
+          echo "$connections"
+          if printf %s "$connections" | grep -q 'credential_ref'; then
+            echo 'FAIL -> public connection listing exposed credential_ref'
+            exit 1
+          fi
+          if printf %s "$connections" | grep -Fq "$GITHUB_TOKEN"; then
+            echo 'FAIL -> public connection listing exposed GitHub token'
+            exit 1
+          fi
+
+          AGENT_AUTHORITY_HOME="$AA_HOME" node quickstart-github-connected.mjs "$GITHUB_REPOSITORY" octocat/Hello-World
+
+          if grep -R -F "$GITHUB_TOKEN" "$AA_HOME" >/dev/null 2>&1; then
+            echo 'FAIL -> GitHub token was persisted in plaintext under AGENT_AUTHORITY_HOME'
+            exit 1
+          fi
+
+          test -f "$AA_HOME/vault/secrets.enc.json"
+          echo 'PASS -> packed consumer used encrypted local connection + task.execute() against live GitHub'

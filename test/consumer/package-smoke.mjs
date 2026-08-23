@@ -19,6 +19,7 @@ import { MissionMcpGateway } from '@nullsquare/agent-authority/mcp-gateway';
 import { githubIssueListSelectedNumberAuthorityExtractor } from '@nullsquare/agent-authority/providers/github';
 import { gmailThreadSenderAuthorityExtractor } from '@nullsquare/agent-authority/providers/google';
 import { JsonFileTaskLeaseStore } from '@nullsquare/agent-authority/storage';
+import { createTask } from '@nullsquare/agent-authority/task';
 import { createTaskLease } from '@nullsquare/agent-authority/task-lease';
 
 assert.equal(typeof createExecutionEvidence, 'function');
@@ -28,6 +29,7 @@ assert.equal(typeof ExecutingAuthorityRuntime.prototype.executeTaskLease, 'funct
 assert.equal(typeof MissionMcpGateway, 'function');
 assert.equal(typeof DurableTaskLeaseSession, 'function');
 assert.equal(typeof JsonFileTaskLeaseStore, 'function');
+assert.equal(typeof createTask, 'function');
 
 const mission = {
   version: '0.1',
@@ -111,11 +113,59 @@ try {
   );
   assert.equal(effects, 1);
 
+  const productTask = createTask({
+    principal: 'user:consumer',
+    agent: 'agent:consumer',
+    request: 'Update only item alpha through the task-first API',
+    permissions: {
+      demo: { allow: ['item.write'], constraints: {} }
+    },
+    authority: {
+      item: { kind: 'demo.item', value: 'alpha' }
+    },
+    bindings: [
+      { service: 'demo', action: 'item.write', field: 'item', authority: 'item' }
+    ],
+    store: new JsonFileTaskLeaseStore({
+      dir: join(home, 'state', 'product-task-leases'),
+      keyPath: join(home, 'vault', 'master.key')
+    })
+  });
+
+  let productEffects = 0;
+  const productAllowed = await productTask.run(
+    { service: 'demo', action: 'item.write', context: { item: 'alpha' } },
+    async () => {
+      productEffects += 1;
+      return { saved: 'alpha' };
+    }
+  );
+  assert.deepEqual(productAllowed.output, { saved: 'alpha' });
+
+  let productStepUp;
+  await assert.rejects(
+    () => productTask.run(
+      { service: 'demo', action: 'item.write', context: { item: 'beta' } },
+      async () => {
+        productEffects += 1;
+        return { saved: 'beta' };
+      }
+    ),
+    (error) => {
+      productStepUp = error;
+      return error instanceof AuthorityApprovalRequiredError && error.code === 'authority_delta_required';
+    }
+  );
+  assert.equal(productEffects, 1);
+  assert.equal(productTask.explain(productStepUp).established_authority.value, 'alpha');
+  productTask.complete('task-first consumer smoke complete');
+  assert.equal(productTask.status, 'completed');
+
   console.log('PASS -> packed package imported only through public exports');
+  console.log('PASS -> task-first public API is usable with explicit permissions and durable local state');
   console.log('PASS -> durable Task Lease store/session public exports are usable');
   console.log('PASS -> evidence, provider extractor and transport-invariance exports are present');
-  console.log('PASS -> authorized effect executed exactly once');
-  console.log('PASS -> unrelated and post-completion effects executed zero times');
+  console.log('PASS -> authorized effects execute while unrelated and post-completion effects execute zero times');
 } finally {
   rmSync(home, { recursive: true, force: true });
 }

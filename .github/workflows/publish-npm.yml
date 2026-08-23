@@ -30,6 +30,8 @@ jobs:
         run: |
           npm test
           npm run test:ai-sdk
+          npm run demo:task
+          npm run benchmark:task
           npm run demo:task-lease
           npm run check:syntax
           npm run check:package

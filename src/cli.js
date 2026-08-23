@@ -6,7 +6,7 @@ import { createAgentToken, parseTtl } from './agent-auth.js';
 import { createRuntimeEnvironment } from './runtime-env.js';
 import { authorityHome, ensureAuthorityHome, loadConfig, saveConfig } from './storage.js';
 
-const VERSION = '0.3.0';
+const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
 function fail(message, code = 1) {
   console.error(`error: ${message}`);
@@ -144,7 +144,7 @@ async function connectionsCommand(args) {
 }
 
 async function connectGitHub(args) {
-  if (!has(args, '--token-stdin')) throw new Error('GitHub currently requires --token-stdin; browser OAuth/PKCE is the next provider-onboarding milestone');
+  if (!has(args, '--token-stdin')) throw new Error('GitHub local onboarding currently requires --token-stdin');
   const home = homeFrom(args);
   const env = createRuntimeEnvironment({ home });
   const token = await readStdinSecret();
@@ -184,7 +184,7 @@ async function disconnectGitHub(args) {
   const accountId = flag(args, '--account', 'default');
   const result = env.broker.disconnect({ principal_id: env.config.principal_id, service: 'github', account_id: accountId });
   if (!result) throw new Error(`GitHub account ${accountId} is not connected`);
-  console.log(`✓ GitHub ${accountId} disconnected and local credential removed`);
+  console.log(`✓ GitHub ${result.account_id} disconnected and local credential removed`);
 }
 
 async function agentCommand(args) {

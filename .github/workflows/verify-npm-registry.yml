@@ -44,9 +44,6 @@ jobs:
           actual=$(npm view "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" version)
           test "$actual" = "${{ steps.package.outputs.version }}"
 
-      # The registry consumer is the release-facing contract. v0.4.7 adds the
-      # connected task surface to the existing task-first, durability, evidence
-      # and transport smoke coverage.
       - name: Verify clean registry consumer and current public behavior
         shell: bash
         run: |
@@ -54,6 +51,7 @@ jobs:
           CONSUMER="$(mktemp -d)"
           cp "$GITHUB_WORKSPACE/test/consumer/package-smoke.mjs" "$CONSUMER/package-smoke.mjs"
           cp "$GITHUB_WORKSPACE/test/consumer/connected-smoke.mjs" "$CONSUMER/connected-smoke.mjs"
+          cp "$GITHUB_WORKSPACE/test/consumer/coding-smoke.mjs" "$CONSUMER/coding-smoke.mjs"
           cd "$CONSUMER"
           npm init -y >/dev/null
           npm install "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" --ignore-scripts
@@ -63,3 +61,4 @@ jobs:
           fi
           node package-smoke.mjs
           node connected-smoke.mjs
+          node coding-smoke.mjs

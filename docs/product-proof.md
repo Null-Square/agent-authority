@@ -74,11 +74,11 @@ Do not prioritize another deep authorization subsystem until the following are d
 - [x] the same task-first API works in-memory and with durable local state;
 - [x] useful-task completion stays high under the deterministic product benchmark;
 - [x] normal fixture task actions do not trigger unnecessary approvals;
-- [x] unrelated-resource effects execute zero provider callbacks in the deterministic fixture and the live GitHub proof;
+- [x] unrelated-resource effects execute zero provider callbacks in the deterministic fixture, live GitHub proof, and support/communications proof;
 - [x] approval/step-up output explains the established authority and requested delta clearly;
 - [ ] at least one external developer uses the package without project-author assistance.
 
-The checked utility items are evidence about the current deterministic fixture and live GitHub proof, not a claim that arbitrary real-world agent workloads have already met the same rates.
+The checked utility items are evidence about the current deterministic fixtures and live GitHub proof, not a claim that arbitrary real-world agent workloads have already met the same rates.
 
 ## First live provider product proof
 
@@ -121,6 +121,40 @@ Passing CI evidence from the live run:
 - the temporary validation comment was deleted outside the authority proof.
 
 This establishes a real-provider product proof for the facade, but it is **not yet** the full coding-agent product workflow. Branch creation, file edits and PR creation still need to be chained under task-derived authority while merge/deploy remain outside the task.
+
+## Cross-provider support/communications proof
+
+`examples/task-first-support.js` exercises the same public facade across two service boundaries using the exact field names and normalized sender shape used by the Google adapter:
+
+```text
+Task: handle one customer email and schedule the requested meeting
+
+origin thread authority
+      |
+      v
+task.run(gmail:thread.read)
+      |
+      v
+reviewed Gmail sender extractor
+      |
+      v
+customer@example.com
+      |
+      v
+task.bind(calendar:event.create.attendee_email)
+      |
+      +--> exact customer meeting -> ALLOW
+      +--> unrelated attendee -> STEP-UP, zero Calendar callbacks
+      |
+      v
+task.complete() -> same meeting authority no longer usable
+```
+
+The task also binds the Gmail `thread_id` and Calendar `calendar_id` to explicit task-entry roots. A different Gmail thread is stopped before its callback runs.
+
+The example and `test/task-product-support.test.js` run on Node 20 and Node 22 CI. The support proof demonstrates that the task-first model crosses Gmail -> Calendar without a second authorization abstraction.
+
+This is intentionally a **self-contained product proof**. It mirrors the real Google provider contract but does not close the separate public Google Actions evidence gate; that gate still requires repository OAuth secrets.
 
 ## Utility metrics
 
@@ -178,7 +212,7 @@ Desired authority lineage:
 email thread -> customer -> meeting / CRM record / reply target
 ```
 
-The underlying connected account may have broad access; task authority follows only the customer/resource discovered through the authorized thread.
+The self-contained Gmail-thread -> exact Calendar-attendee slice is now established. The next value proof should connect the same customer authority to another useful downstream action (for example reply/CRM) or rerun the task-first flow with the real Google Actions fixture once repository OAuth secrets are available.
 
 ### Operations / finance agent
 

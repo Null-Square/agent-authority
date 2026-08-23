@@ -6,33 +6,37 @@ Before any publication:
 
 1. the release commit must pass CI, CodeQL, live GitHub validation, current AI SDK integration validation, and packed-consumer validation;
 2. `npm pack` must contain the documented public exports;
-3. a fresh Node.js 20 consumer must install the tarball and run the core Task Lease smoke test;
+3. a fresh Node.js 20 consumer must install the tarball and run the current public behavior smoke test;
 4. the optional AI SDK integration must import without making `ai` a production dependency;
 5. the registry package must be public and its repository metadata must point to `https://github.com/Null-Square/agent-authority`.
 
 After publication, verify from a fresh project with:
 
 ```bash
-npm install @nullsquare/agent-authority@0.4.4
+npm install @nullsquare/agent-authority@0.4.5
 ```
 
 Then run the same consumer smoke flow through the registry-installed package. Registry verification is part of the release gate; a successful `npm publish` command alone is not sufficient.
 
-The repository also includes `.github/workflows/verify-npm-registry.yml`, which verifies registry visibility and a clean consumer install. For v0.4.4 it verifies the public execution-evidence and two-provider authority-extractor APIs plus the Task-Lease-aware transport surfaces:
+The repository includes `.github/workflows/verify-npm-registry.yml`, which verifies registry visibility, a clean Node.js 20 install, and the current public behavior from the registry artifact. For v0.4.5 the consumer exercises:
 
-- `gmailThreadSenderAuthorityExtractor` from `@nullsquare/agent-authority/providers/google`;
-- `githubIssueListSelectedNumberAuthorityExtractor` from `@nullsquare/agent-authority/providers/github`;
-- `ExecutingAuthorityRuntime.executeTaskLease()` from `@nullsquare/agent-authority/execution`;
-- `MissionMcpGateway` from `@nullsquare/agent-authority/mcp-gateway`.
+- execution evidence and the reviewed Google/GitHub authority extractors;
+- `ExecutingAuthorityRuntime.executeTaskLease()` and `MissionMcpGateway` transport surfaces;
+- `JsonFileTaskLeaseStore` from `@nullsquare/agent-authority/storage`;
+- `DurableTaskLeaseSession` and `createDurableTaskLeaseSession()` from `@nullsquare/agent-authority/durable-task-lease`;
+- durable allow / `authority_delta_required` / completion behavior;
+- the requirement that the optional `ai` package is not installed as a production dependency.
 
-This makes the registry artifact verification cover both the two-provider execution-evidence surface and the SDK/MCP/broker transport-invariance surface exercised by the repository conformance tests.
+This makes the registry artifact verification cover the same public durability, evidence and transport surfaces exercised by the repository tests rather than checking export names alone.
+
+The v0.4.5 independent registry verification passed after publication: npm visibility succeeded and the fresh registry-installed consumer completed the durable Task Lease smoke.
 
 ## npm vs GitHub release surfaces
 
 Publishing to the public npm registry does not automatically create either a GitHub Release or a GitHub Packages entry.
 
 - **npm registry** — `npm publish --access public` publishes `@nullsquare/agent-authority` to `registry.npmjs.org` / npmjs.com. This is the package users install with `npm install`.
-- **GitHub Releases** — a separate GitHub object, normally backed by a Git tag such as `v0.4.4`. A release must be created explicitly or by release automation.
+- **GitHub Releases** — a separate GitHub object, normally backed by a Git tag such as `v0.4.5`. A release must be created explicitly or by release automation.
 - **GitHub Packages** — a separate package registry. It only appears when the package is published to GitHub's npm registry (`npm.pkg.github.com`); publishing to npmjs.com does not populate it.
 
 Agent Authority currently uses npmjs.com as its public package registry. Therefore an empty GitHub **Packages** section is expected unless the project intentionally adopts dual publication. A GitHub **Release** is still useful for source-release discoverability and should track published versions, but it is independent from npm publication.

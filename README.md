@@ -81,6 +81,30 @@ The quickstart uses the real published `createTask()` API and reviewed GitHub au
 
 An automated blank-project gate independently installed `@nullsquare/agent-authority@0.4.6` from npm on Node 20 and ran this exact file successfully. That proves the current published package supports the documented path; it does **not** replace the still-open first-time-human under-10-minute adoption test.
 
+### Next: make one real GitHub call, still with no credential
+
+From the same blank project:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Null-Square/agent-authority/main/examples/quickstart-github-live.mjs -o quickstart-github-live.mjs
+node quickstart-github-live.mjs
+```
+
+Expected shape:
+
+```text
+Standing GitHub permission -> repo.read
+Task authority -> Null-Square/agent-authority
+GitHub mode -> public API; no credential required
+ALLOW -> real GitHub returned Null-Square/agent-authority
+STEP-UP -> The task established authority for "Null-Square/agent-authority" but this action requested "octocat/Hello-World".
+PASS -> broader standing repo.read permission could not reach an unrelated repository for this task
+```
+
+This deliberately models the account/app capability as broader than the task. Mission-level `repo.read` can read repositories generally, while the Task authority root allows this task to reach only `Null-Square/agent-authority`. The first request makes one real public GitHub `fetch()`; the unrelated repository is stopped before a second network call.
+
+A separate blank-project CI gate has passed this exact live path against npm `0.4.6`. Authenticated/private-repository onboarding remains separate follow-on work.
+
 See [Fresh-install quickstart](docs/quickstart.md).
 
 ## Task-first API
@@ -333,7 +357,8 @@ See [Durable Task Leases](docs/durable-task-leases.md).
 - automatic durable Task Lease sessions;
 - task-first public facade and deterministic utility regression gate;
 - self-contained support/communications and operations/finance product proofs;
-- blank-project quickstart against the current npm package;
+- blank-project fixture quickstart against the current npm package;
+- blank-project real public GitHub onboarding with broader standing permission and narrower task authority;
 - Node 20/22 CI, coverage, packed-consumer validation and CodeQL;
 - independent npm registry consumer verification.
 
@@ -365,7 +390,7 @@ This is still a validation implementation.
 - Source-data changes do not yet automatically invalidate already-derived authority.
 - Approved authority deltas are surfaced but not automatically applied into a live durable task.
 - Current Task Lease bindings are exact equality. The finance proof therefore steps up for a partial refund as well as an over-refund; a derived numeric ceiling remains an evidence-driven product question rather than a general policy language.
-- GitHub token-stdin and the local encrypted vault are developer bridges, not final production OAuth/KMS UX.
+- Public GitHub onboarding is credential-free for read-only public repositories; authenticated/private-repository onboarding and production OAuth/KMS UX remain incomplete.
 - Remote authenticated deployment and production approval UX remain incomplete.
 
 These are real limitations. They are not reasons to build every possible infrastructure layer before product adoption is proven.

@@ -1,0 +1,39 @@
+name: Verify live fresh-install quickstart
+
+on:
+  pull_request:
+    paths:
+      - examples/quickstart-github-live.mjs
+      - docs/quickstart.md
+      - README.md
+      - ROADMAP.md
+      - .github/workflows/verify-live-quickstart.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-public-github:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Install latest public package in a blank project and call live GitHub
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(npm view @nullsquare/agent-authority version)"
+          CONSUMER="$(mktemp -d)"
+          cp "$GITHUB_WORKSPACE/examples/quickstart-github-live.mjs" "$CONSUMER/quickstart-github-live.mjs"
+          cd "$CONSUMER"
+          npm init -y >/dev/null
+          npm install "@nullsquare/agent-authority@$VERSION" --ignore-scripts
+
+          echo "Live fresh-install quickstart against @nullsquare/agent-authority@$VERSION"
+          node quickstart-github-live.mjs Null-Square/agent-authority octocat/Hello-World

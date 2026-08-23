@@ -10,7 +10,7 @@
 
 [Task-first API](#task-first-api) · [Product proof gate](docs/product-proof.md) · [Task Leases](docs/task-leases.md) · [Durability](docs/durable-task-leases.md) · [Evidence](docs/evidence.md) · [Transport invariance](docs/transport-invariance.md) · [Roadmap](ROADMAP.md)
 
-> **Status: public pre-alpha / v0.4.5 Developer Preview on npm.** The `main` branch may contain unreleased work for the next preview. Agent Authority is not production-ready yet.
+> **Status: public pre-alpha / v0.4.6 Developer Preview on npm.** The task-first API is published as `@nullsquare/agent-authority/task`. Agent Authority is not production-ready yet.
 
 </div>
 
@@ -304,6 +304,7 @@ See [Durable Task Leases](docs/durable-task-leases.md).
 - authenticated durable Task Lease recovery;
 - stale-writer/CAS and mission-alias protection;
 - automatic durable Task Lease sessions;
+- task-first public facade and deterministic utility regression gate;
 - Node 20/22 CI, coverage, packed-consumer validation and CodeQL;
 - independent npm registry consumer verification.
 

@@ -397,7 +397,9 @@ export class JsonFileTaskLeaseStore {
 
     let lease;
     try {
-      lease = TaskLease.restore({ mission, snapshot: envelope.snapshot });
+      // Recover against an isolated mission snapshot so a transaction callback
+      // cannot mutate the caller's authority ceiling through shared references.
+      lease = TaskLease.restore({ mission: structuredClone(mission), snapshot: envelope.snapshot });
     } catch (error) {
       if (!error.code) error.code = 'task_lease_snapshot_invalid';
       throw error;

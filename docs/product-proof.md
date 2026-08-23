@@ -74,7 +74,7 @@ Do not prioritize another deep authorization subsystem until the following are d
 - [x] the same task-first API works in-memory and with durable local state;
 - [x] useful-task completion stays high under the deterministic product benchmark;
 - [x] normal fixture task actions do not trigger unnecessary approvals;
-- [x] unrelated-resource effects execute zero provider callbacks in the deterministic fixture, live GitHub proof, and support/communications proof;
+- [x] unrelated-resource effects execute zero provider callbacks in the deterministic fixture, live GitHub proof, support/communications proof, and operations/finance proof;
 - [x] approval/step-up output explains the established authority and requested delta clearly;
 - [ ] at least one external developer uses the package without project-author assistance.
 
@@ -156,6 +156,52 @@ The example and `test/task-product-support.test.js` run on Node 20 and Node 22 C
 
 This is intentionally a **self-contained product proof**. It mirrors the real Google provider contract but does not close the separate public Google Actions evidence gate; that gate still requires repository OAuth secrets.
 
+## Operations / finance lineage proof
+
+`examples/task-first-finance.js` exercises a longer evidence-derived authority chain without adding another provider, policy DSL, or numeric relation language:
+
+```text
+Task: resolve one support ticket by refunding only its payment
+
+ticket:481
+   |
+   v
+task.run(helpdesk:ticket.read)
+   |
+   v
+order:991
+   |
+   v
+task.run(orders:order.read)
+   |
+   v
+payment:abc123
+   |
+   v
+task.run(payments:payment.read)
+   |
+   +--> amount = 12500 minor units
+   +--> currency = USD
+   |
+   v
+task.bind(refund payment_id + amount + currency)
+   |
+   +--> exact full refund -> ALLOW
+   +--> another payment -> STEP-UP, zero refund callbacks
+   +--> over-refund -> STEP-UP, zero refund callbacks
+   +--> wrong currency -> STEP-UP, zero refund callbacks
+   +--> partial refund -> STEP-UP under current exact binding model
+   |
+   v
+task.complete() -> same refund authority no longer usable
+```
+
+The task cannot read an arbitrary order before the ticket establishes the order fact: the unresolved binding fails closed before the order callback runs. The same pattern continues through payment and refund.
+
+The example and `test/task-product-finance.test.js` run on Node 20 and Node 22 CI. On the passing fixture, provider-shaped callbacks are exactly one ticket read, one order read, one payment read and one refund.
+
+This proof intentionally exposes a **product limitation rather than hiding it behind new policy machinery**: Task Lease bindings currently require exact equality. Therefore the payment amount `12500` can authorize an exact `12500` refund, but a legitimate partial refund such as `5000` also produces `authority_delta_required`. A future narrow `requested amount <= evidence-derived payment amount` relation may be justified if real provider/adoption evidence shows partial refunds are needed. Until then, the repository should keep this limitation visible instead of adding a general expression language speculatively.
+
 ## Utility metrics
 
 Security tests remain required, but product work should additionally track:
@@ -226,7 +272,7 @@ Desired authority lineage:
 ticket -> customer -> order -> payment -> refund <= original payment
 ```
 
-This is the strongest long-term proof because it combines resource lineage with an amount ceiling.
+The self-contained ticket -> order -> payment -> **exact full refund** lineage is now established. The remaining product question is narrower than the original workflow: whether partial refunds are important enough to justify one evidence-derived numeric ceiling relation. Current exact bindings intentionally step up for a smaller amount rather than guessing that relation into the core.
 
 ## Freeze list
 

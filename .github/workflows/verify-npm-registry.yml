@@ -44,6 +44,9 @@ jobs:
           actual=$(npm view "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" version)
           test "$actual" = "${{ steps.package.outputs.version }}"
 
+      # The repository consumer smoke is the release-facing contract. For
+      # v0.4.6 it includes the task-first API, authority-delta explanation and
+      # durable-store opt-in in addition to the lower-level evidence surfaces.
       - name: Verify clean registry consumer and current public behavior
         shell: bash
         run: |

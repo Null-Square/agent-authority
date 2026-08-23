@@ -44,36 +44,17 @@ jobs:
           actual=$(npm view "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" version)
           test "$actual" = "${{ steps.package.outputs.version }}"
 
-      - name: Verify clean consumer install and current public exports
+      - name: Verify clean registry consumer and current public behavior
         shell: bash
         run: |
           set -euo pipefail
           CONSUMER="$(mktemp -d)"
+          cp "$GITHUB_WORKSPACE/test/consumer/package-smoke.mjs" "$CONSUMER/package-smoke.mjs"
           cd "$CONSUMER"
           npm init -y >/dev/null
           npm install "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" --ignore-scripts
-          node --input-type=module <<'NODE'
-          import { createExecutionEvidence } from '@nullsquare/agent-authority/authority-evidence';
-          import { ExecutingAuthorityRuntime } from '@nullsquare/agent-authority/execution';
-          import { MissionMcpGateway } from '@nullsquare/agent-authority/mcp-gateway';
-          import { createTaskLease } from '@nullsquare/agent-authority/task-lease';
-          import {
-            createGitHubProviderAdapter,
-            githubIssueListSelectedNumberAuthorityExtractor
-          } from '@nullsquare/agent-authority/providers/github';
-          import {
-            createGoogleProviderAdapter,
-            gmailThreadSenderAuthorityExtractor
-          } from '@nullsquare/agent-authority/providers/google';
-
-          if (typeof createTaskLease !== 'function') throw new Error('Task Lease export missing');
-          if (typeof createExecutionEvidence !== 'function') throw new Error('Authority evidence export missing');
-          if (typeof ExecutingAuthorityRuntime !== 'function') throw new Error('ExecutingAuthorityRuntime export missing');
-          if (typeof ExecutingAuthorityRuntime.prototype.executeTaskLease !== 'function') throw new Error('executeTaskLease export missing');
-          if (typeof MissionMcpGateway !== 'function') throw new Error('MissionMcpGateway export missing');
-          if (typeof createGoogleProviderAdapter !== 'function') throw new Error('Google provider export missing');
-          if (typeof gmailThreadSenderAuthorityExtractor !== 'function') throw new Error('Gmail authority extractor export missing');
-          if (typeof createGitHubProviderAdapter !== 'function') throw new Error('GitHub provider export missing');
-          if (typeof githubIssueListSelectedNumberAuthorityExtractor !== 'function') throw new Error('GitHub authority extractor export missing');
-          console.log('registry consumer exports verified');
-          NODE
+          if npm ls ai --all >/dev/null 2>&1; then
+            echo "FAIL -> registry package unexpectedly installed optional AI SDK"
+            exit 1
+          fi
+          node package-smoke.mjs

@@ -54,6 +54,8 @@ jobs:
           npm install "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" --ignore-scripts
           node --input-type=module <<'NODE'
           import { createExecutionEvidence } from '@nullsquare/agent-authority/authority-evidence';
+          import { ExecutingAuthorityRuntime } from '@nullsquare/agent-authority/execution';
+          import { MissionMcpGateway } from '@nullsquare/agent-authority/mcp-gateway';
           import { createTaskLease } from '@nullsquare/agent-authority/task-lease';
           import {
             createGitHubProviderAdapter,
@@ -66,6 +68,9 @@ jobs:
 
           if (typeof createTaskLease !== 'function') throw new Error('Task Lease export missing');
           if (typeof createExecutionEvidence !== 'function') throw new Error('Authority evidence export missing');
+          if (typeof ExecutingAuthorityRuntime !== 'function') throw new Error('ExecutingAuthorityRuntime export missing');
+          if (typeof ExecutingAuthorityRuntime.prototype.executeTaskLease !== 'function') throw new Error('executeTaskLease export missing');
+          if (typeof MissionMcpGateway !== 'function') throw new Error('MissionMcpGateway export missing');
           if (typeof createGoogleProviderAdapter !== 'function') throw new Error('Google provider export missing');
           if (typeof gmailThreadSenderAuthorityExtractor !== 'function') throw new Error('Gmail authority extractor export missing');
           if (typeof createGitHubProviderAdapter !== 'function') throw new Error('GitHub provider export missing');

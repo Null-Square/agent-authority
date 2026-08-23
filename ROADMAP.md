@@ -64,7 +64,7 @@ never silently grow
 
 The core cross-provider behavior is now implemented and exercised against connected Gmail and Calendar accounts. Public Actions reproducibility remains the final M1 evidence gate because GitHub cannot reuse an interactive ChatGPT connector credential; the manual workflow is committed and expects a refresh token stored only as repository secrets.
 
-## M2 — Durable task execution — transactional local state established
+## M2 — Durable task execution — durable session established
 
 Build only what the real Task Lease workflows prove necessary.
 
@@ -72,21 +72,25 @@ Build only what the real Task Lease workflows prove necessary.
 - [x] atomic authenticated fact/binding/status transaction primitive
 - [x] stale-writer compare-and-swap protection for independent recovered worker views
 - [x] local per-lease transaction lock that fails closed on overlap
-- [ ] wire ordinary running Task Lease mutations automatically through the durable transaction boundary
+- [x] ordinary running Task Lease mutations can use the durable transaction boundary through `DurableTaskLeaseSession`
+- [x] security-critical session evaluation refreshes current durable state before the next authority decision
 - [ ] approved authority delta can safely attenuate/update a live lease
 - [x] completion state survives process restart
 - [ ] durable lineage query: why was this exact action authorized?
 - [ ] multi-process stress/recovery tests for multiple agent workers operating under one lease
+- [ ] crash-safe coupling between remote provider side effects, receipts and durable Task Lease state
 
 `JsonFileTaskLeaseStore` writes the complete lease snapshot atomically and authenticates it with a purpose-derived HMAC key from the local Agent Authority master key. Recovery verifies the envelope before authority hydration, binds the snapshot to the exact mission hash, validates status/timestamps and the authority-fact DAG, restores evidence-derived provenance hashes, and verifies the reconstructed Task Lease hash.
 
-`JsonFileTaskLeaseStore.transact()` adds the local durable mutation boundary: acquire one per-lease filesystem lock, reload the authenticated current state, optionally compare an expected lease hash, apply one synchronous Task Lease mutation, validate the complete resulting authority graph, atomically replace the authenticated snapshot, and return the previous/new hashes. A stale worker receives `task_lease_state_conflict`; an overlapping local transaction receives `task_lease_state_locked`.
+`JsonFileTaskLeaseStore.transact()` is the local durable mutation boundary: acquire one per-lease filesystem lock, reload authenticated current state, compare an optional expected lease hash, apply one synchronous Task Lease mutation, validate the complete authority graph, and atomically replace the authenticated snapshot. Stale writers receive `task_lease_state_conflict`; overlapping local transactions receive `task_lease_state_locked`.
 
-`test/task-lease-persistence.test.js` proves that strict derived authority survives restart without broadening, unrelated resources still require step-up, completion and expiry survive restart, edited state fails authentication, mission-ID reuse with a changed/expanded mission is rejected, bad lineage fails closed, a fact plus binding can commit as one snapshot, stale worker views cannot overwrite newer authority, raw changed saves cannot bypass CAS, and failed/async transactions leave durable state unchanged.
+`DurableTaskLeaseSession` is the normal mutation facade over that primitive. `addRoot()`, legacy `derive()`, strict `deriveFromEvidence()`, `bind()` and `complete()` commit through compare-and-swap and update the session only after durable success. The session exposes detached mission/snapshot/fact views rather than its mutable internal Task Lease. It never auto-replays a stale semantic mutation after a conflict.
 
-The transaction primitive is explicit in this slice. Existing callers can still mutate an in-memory Task Lease directly; durable applications should perform authority-state changes through `transact()` or an expected-hash save. The next M2 slice should make the normal running lease/session mutation surface use this transaction boundary automatically. See `docs/durable-task-leases.md`.
+The session also implements the Task Lease `evaluate(runtime, request)` shape used by guard/MCP/broker paths. Evaluation refreshes authenticated durable state first, so another worker's already-committed completion or narrowing is observed before the next decision. Tests also prove that execution evidence captured at H0 cannot be automatically converted into a derived fact after another worker commits H1; derivation fails on CAS and requires explicit reconsideration.
 
-**Success criterion:** a Task Lease survives daemon/process restarts without gaining authority or losing provenance, and cooperating local workers cannot silently overwrite a newer authority state. Authenticated recovery and the local transaction/CAS primitive are now demonstrated; automatic session coupling, approved deltas, and stronger multi-process stress remain open.
+This does **not** yet turn a remote provider side effect and a local Task Lease transition into one distributed transaction. A different worker can still change durable state after an ALLOW decision and before an asynchronous provider effect begins. That TOCTOU/effect-coupling problem remains explicit follow-on M2 work rather than being hidden behind the local filesystem lock. See `docs/durable-task-leases.md`.
+
+**Success criterion:** a Task Lease survives restart without gaining authority or losing provenance, cooperating local workers cannot silently overwrite newer authority, and ordinary durable mutations use the CAS boundary by default through the session API. Authenticated recovery, local transactions and the durable session are now demonstrated; approved deltas, stronger multi-process stress and remote-effect coupling remain open.
 
 ## M3 — Trustworthy derived facts — two-provider proof established
 
@@ -176,4 +180,4 @@ Only after operational evidence.
 2. How should an approved authority delta update a running task without opening a broader wildcard permission?
 3. How should source-data changes invalidate downstream derived authority?
 4. What provider/tool metadata is required to map operations to resource context reliably?
-5. How should transport invariance be preserved when Task Leases become durable and move across processes or hosts?
+5. How should a local ALLOW decision be coupled to an asynchronous remote effect without holding a filesystem lease lock across network I/O?

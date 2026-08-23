@@ -6,7 +6,16 @@ import {
   randomUUID,
   timingSafeEqual
 } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { TaskLease } from './task-lease.js';
@@ -73,6 +82,26 @@ function taskLeaseMac(key, envelope) {
 function authenticationError(message) {
   const error = new Error(message);
   error.code = 'task_lease_state_authentication_failed';
+  return error;
+}
+
+function stateConflictError(message, details = {}) {
+  const error = new Error(message);
+  error.code = 'task_lease_state_conflict';
+  Object.assign(error, details);
+  return error;
+}
+
+function stateLockedError(leaseId) {
+  const error = new Error(`task lease ${leaseId} is already being updated by another local worker`);
+  error.code = 'task_lease_state_locked';
+  error.lease_id = leaseId;
+  return error;
+}
+
+function transactionError(code, message) {
+  const error = new Error(message);
+  error.code = code;
   return error;
 }
 
@@ -232,9 +261,13 @@ export class EncryptedFileSecretStore {
  * exact lease/mission identity, snapshot hash and TaskLease lineage validation
  * before reconstructed authority is returned to the caller.
  *
- * This protects against accidental/caller-controlled state-file modification on
- * the trusted host. It is not designed to contain a malicious host or an
- * attacker that can read the local master key.
+ * Durable mutations should go through transact(). The per-lease lock serializes
+ * local read-modify-write transactions, while expected_lease_hash provides an
+ * optimistic compare-and-swap check for workers operating on recovered views.
+ *
+ * This protects against accidental/caller-controlled state-file modification and
+ * stale local writers on the trusted host. It is not designed to contain a
+ * malicious host or an attacker that can read the local master key.
  */
 export class JsonFileTaskLeaseStore {
   constructor({ dir, keyPath }) {
@@ -254,8 +287,27 @@ export class JsonFileTaskLeaseStore {
     return join(this.dir, safeLeaseFileName(leaseId));
   }
 
-  save(lease) {
-    if (!(lease instanceof TaskLease)) throw new Error('TaskLease instance is required');
+  lockPath(leaseId) {
+    return `${this.path(leaseId)}.lock`;
+  }
+
+  withLeaseLock(leaseId, fn) {
+    const lockPath = this.lockPath(leaseId);
+    try {
+      mkdirSync(lockPath, { mode: 0o700 });
+    } catch (error) {
+      if (error?.code === 'EEXIST') throw stateLockedError(leaseId);
+      throw error;
+    }
+
+    try {
+      return fn();
+    } finally {
+      rmSync(lockPath, { recursive: true, force: true });
+    }
+  }
+
+  envelopeFor(lease) {
     const snapshot = lease.snapshot();
     const envelope = {
       version: 1,
@@ -265,12 +317,59 @@ export class JsonFileTaskLeaseStore {
       snapshot
     };
     envelope.mac = taskLeaseMac(this.key(), envelope);
-    atomicJson(this.path(lease.lease_id), envelope, 0o600);
+    return envelope;
+  }
+
+  writeLease(lease, path = this.path(lease.lease_id)) {
+    const envelope = this.envelopeFor(lease);
+    atomicJson(path, envelope, 0o600);
     return {
       lease_id: envelope.lease_id,
       mission_id: envelope.mission_id,
       lease_hash: envelope.lease_hash
     };
+  }
+
+  save(lease, { expected_lease_hash = null } = {}) {
+    if (!(lease instanceof TaskLease)) throw new Error('TaskLease instance is required');
+    return this.withLeaseLock(lease.lease_id, () => {
+      const path = this.path(lease.lease_id);
+      if (existsSync(path)) {
+        const current = this.load({ mission: lease.mission, lease_id: lease.lease_id });
+        const currentHash = current.hash();
+        const nextHash = lease.hash();
+
+        if (expected_lease_hash !== null && currentHash !== expected_lease_hash) {
+          throw stateConflictError('task lease state changed since the caller recovered it', {
+            lease_id: lease.lease_id,
+            expected_lease_hash,
+            current_lease_hash: currentHash
+          });
+        }
+        if (expected_lease_hash === null && currentHash !== nextHash) {
+          throw stateConflictError(
+            'changed durable Task Lease state requires expected_lease_hash or transact()',
+            { lease_id: lease.lease_id, current_lease_hash: currentHash, attempted_lease_hash: nextHash }
+          );
+        }
+        if (currentHash === nextHash) {
+          return {
+            lease_id: lease.lease_id,
+            mission_id: lease.mission.mission_id,
+            lease_hash: currentHash
+          };
+        }
+      } else if (expected_lease_hash !== null) {
+        throw stateConflictError('task lease state does not exist for the supplied expected hash', {
+          lease_id: lease.lease_id,
+          expected_lease_hash,
+          current_lease_hash: null
+        });
+      }
+
+      const validated = TaskLease.restore({ mission: lease.mission, snapshot: lease.snapshot() });
+      return this.writeLease(validated, path);
+    });
   }
 
   load({ mission, lease_id } = {}) {
@@ -307,6 +406,56 @@ export class JsonFileTaskLeaseStore {
       throw authenticationError('task lease state hash does not match recovered authority');
     }
     return lease;
+  }
+
+  /**
+   * Apply one synchronous durable mutation to the authenticated current lease.
+   *
+   * The mutation runs against a freshly recovered lease while holding an
+   * exclusive local per-lease lock. If expected_lease_hash is supplied, a stale
+   * worker fails before its mutation is applied. The resulting snapshot is fully
+   * validated and atomically replaced before the updated lease is returned.
+   */
+  transact({ mission, lease_id, expected_lease_hash = null, mutate } = {}) {
+    if (!mission) throw new Error('mission is required');
+    if (!lease_id) throw new Error('lease_id is required');
+    if (typeof mutate !== 'function') throw new Error('transaction mutate function is required');
+
+    return this.withLeaseLock(lease_id, () => {
+      const current = this.load({ mission, lease_id });
+      if (!current) {
+        throw transactionError('task_lease_state_missing', `task lease ${lease_id} has no durable state`);
+      }
+
+      const previousHash = current.hash();
+      if (expected_lease_hash !== null && previousHash !== expected_lease_hash) {
+        throw stateConflictError('task lease state changed since the caller recovered it', {
+          lease_id,
+          expected_lease_hash,
+          current_lease_hash: previousHash
+        });
+      }
+
+      const value = mutate(current);
+      if (value && typeof value.then === 'function') {
+        throw transactionError(
+          'task_lease_transaction_async_unsupported',
+          'durable Task Lease transactions must be synchronous and side-effect free outside lease state'
+        );
+      }
+      if (current.lease_id !== lease_id || current.mission.mission_id !== mission.mission_id) {
+        throw transactionError('task_lease_transaction_identity_changed', 'transaction changed Task Lease identity');
+      }
+
+      const validated = TaskLease.restore({ mission, snapshot: current.snapshot() });
+      const saved = this.writeLease(validated, this.path(lease_id));
+      return {
+        lease: validated,
+        value,
+        previous_lease_hash: previousHash,
+        lease_hash: saved.lease_hash
+      };
+    });
   }
 
   delete(leaseId) {

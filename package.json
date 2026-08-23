@@ -1,6 +1,6 @@
 {
   "name": "@nullsquare/agent-authority",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "description": "Task-bounded authority runtime for AI agents: give agents tasks, not standing account permissions.",
   "license": "Apache-2.0",
   "type": "module",

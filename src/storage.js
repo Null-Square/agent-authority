@@ -1,7 +1,15 @@
-import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHmac,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual
+} from 'node:crypto';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { TaskLease } from './task-lease.js';
 
 export function authorityHome(env = process.env) {
   return resolve(env.AGENT_AUTHORITY_HOME || join(homedir(), '.agent-authority'));
@@ -26,6 +34,48 @@ function atomicJson(path, value, mode = 0o600) {
   try { chmodSync(path, mode); } catch {}
 }
 
+function loadOrCreateMasterKey(keyPath) {
+  ensureDir(dirname(keyPath));
+  if (!existsSync(keyPath)) {
+    writeFileSync(keyPath, randomBytes(32), { mode: 0o600 });
+    try { chmodSync(keyPath, 0o600); } catch {}
+  }
+  const key = readFileSync(keyPath);
+  if (key.length !== 32) throw new Error('Agent Authority master key is invalid');
+  return key;
+}
+
+function deriveLocalKey(keyPath, purpose) {
+  return createHmac('sha256', loadOrCreateMasterKey(keyPath))
+    .update(`agent-authority/${purpose}/v1`)
+    .digest();
+}
+
+function safeLeaseFileName(leaseId) {
+  if (typeof leaseId !== 'string' || leaseId.trim() === '') throw new Error('lease_id is required');
+  return `${Buffer.from(leaseId, 'utf8').toString('base64url')}.json`;
+}
+
+function taskLeaseEnvelopePayload(envelope) {
+  return JSON.stringify({
+    version: envelope.version,
+    lease_id: envelope.lease_id,
+    mission_id: envelope.mission_id,
+    lease_hash: envelope.lease_hash,
+    snapshot: envelope.snapshot
+  });
+}
+
+function taskLeaseMac(key, envelope) {
+  return createHmac('sha256', key).update(taskLeaseEnvelopePayload(envelope)).digest('hex');
+}
+
+function authenticationError(message) {
+  const error = new Error(message);
+  error.code = 'task_lease_state_authentication_failed';
+  return error;
+}
+
 export function defaultConfig(home = authorityHome()) {
   return {
     version: 1,
@@ -37,6 +87,7 @@ export function defaultConfig(home = authorityHome()) {
       master_key: join(home, 'vault', 'master.key'),
       revocations: join(home, 'state', 'revocations.json'),
       usage: join(home, 'state', 'usage.json'),
+      task_leases: join(home, 'state', 'task-leases'),
       receipts: join(home, 'receipts')
     }
   };
@@ -136,13 +187,7 @@ export class EncryptedFileSecretStore {
   }
 
   key() {
-    if (!existsSync(this.keyPath)) {
-      writeFileSync(this.keyPath, randomBytes(32), { mode: 0o600 });
-      try { chmodSync(this.keyPath, 0o600); } catch {}
-    }
-    const key = readFileSync(this.keyPath);
-    if (key.length !== 32) throw new Error('Agent Authority master key is invalid');
-    return key;
+    return loadOrCreateMasterKey(this.keyPath);
   }
 
   all() { return readJson(this.path, {}); }
@@ -175,6 +220,99 @@ export class EncryptedFileSecretStore {
     if (!all[ref]) return false;
     delete all[ref];
     this.write(all);
+    return true;
+  }
+}
+
+/**
+ * Local authenticated persistence for Task Lease authority state.
+ *
+ * The entire snapshot is written atomically and authenticated with an HMAC key
+ * derived from the Agent Authority local master key. Loading verifies the MAC,
+ * exact lease/mission identity, snapshot hash and TaskLease lineage validation
+ * before reconstructed authority is returned to the caller.
+ *
+ * This protects against accidental/caller-controlled state-file modification on
+ * the trusted host. It is not designed to contain a malicious host or an
+ * attacker that can read the local master key.
+ */
+export class JsonFileTaskLeaseStore {
+  constructor({ dir, keyPath }) {
+    if (!dir) throw new Error('task lease store dir is required');
+    if (!keyPath) throw new Error('task lease store keyPath is required');
+    this.dir = dir;
+    this.keyPath = keyPath;
+    ensureDir(dir);
+    ensureDir(dirname(keyPath));
+  }
+
+  key() {
+    return deriveLocalKey(this.keyPath, 'task-lease-state');
+  }
+
+  path(leaseId) {
+    return join(this.dir, safeLeaseFileName(leaseId));
+  }
+
+  save(lease) {
+    if (!(lease instanceof TaskLease)) throw new Error('TaskLease instance is required');
+    const snapshot = lease.snapshot();
+    const envelope = {
+      version: 1,
+      lease_id: lease.lease_id,
+      mission_id: lease.mission.mission_id,
+      lease_hash: lease.hash(),
+      snapshot
+    };
+    envelope.mac = taskLeaseMac(this.key(), envelope);
+    atomicJson(this.path(lease.lease_id), envelope, 0o600);
+    return {
+      lease_id: envelope.lease_id,
+      mission_id: envelope.mission_id,
+      lease_hash: envelope.lease_hash
+    };
+  }
+
+  load({ mission, lease_id } = {}) {
+    if (!mission) throw new Error('mission is required');
+    if (!lease_id) throw new Error('lease_id is required');
+    const path = this.path(lease_id);
+    if (!existsSync(path)) return null;
+
+    const envelope = readJson(path, null);
+    if (!envelope || envelope.version !== 1) {
+      throw authenticationError('task lease state envelope is invalid or unsupported');
+    }
+    if (envelope.lease_id !== lease_id || envelope.mission_id !== mission.mission_id) {
+      throw authenticationError('task lease state identity does not match the requested lease and mission');
+    }
+    if (typeof envelope.mac !== 'string' || !/^[a-f0-9]{64}$/.test(envelope.mac)) {
+      throw authenticationError('task lease state authentication tag is invalid');
+    }
+
+    const expected = Buffer.from(taskLeaseMac(this.key(), envelope), 'hex');
+    const actual = Buffer.from(envelope.mac, 'hex');
+    if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
+      throw authenticationError('task lease state authentication failed');
+    }
+
+    let lease;
+    try {
+      lease = TaskLease.restore({ mission, snapshot: envelope.snapshot });
+    } catch (error) {
+      if (!error.code) error.code = 'task_lease_snapshot_invalid';
+      throw error;
+    }
+    if (lease.lease_id !== lease_id || lease.hash() !== envelope.lease_hash) {
+      throw authenticationError('task lease state hash does not match recovered authority');
+    }
+    return lease;
+  }
+
+  delete(leaseId) {
+    const path = this.path(leaseId);
+    if (!existsSync(path)) return false;
+    unlinkSync(path);
     return true;
   }
 }

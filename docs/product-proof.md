@@ -71,12 +71,56 @@ Do not prioritize another deep authorization subsystem until the following are d
 
 - [ ] a new developer can run a meaningful task-first example in under 10 minutes;
 - [ ] at least three real workflow examples exist: coding, support/communications, and operations/finance;
-- [ ] the same task-first API works in-memory and with durable local state;
-- [ ] useful-task completion stays high under the product benchmark;
-- [ ] normal task actions do not trigger unnecessary approvals;
-- [ ] unrelated-resource effects execute zero provider callbacks;
-- [ ] approval/step-up output explains the established authority and requested delta clearly;
+- [x] the same task-first API works in-memory and with durable local state;
+- [x] useful-task completion stays high under the deterministic product benchmark;
+- [x] normal fixture task actions do not trigger unnecessary approvals;
+- [x] unrelated-resource effects execute zero provider callbacks in the deterministic fixture and the live GitHub proof;
+- [x] approval/step-up output explains the established authority and requested delta clearly;
 - [ ] at least one external developer uses the package without project-author assistance.
+
+The checked utility items are evidence about the current deterministic fixture and live GitHub proof, not a claim that arbitrary real-world agent workloads have already met the same rates.
+
+## First live provider product proof
+
+The existing GitHub Actions mutation validation now runs through the public task-first API rather than hand-assembling Mission + Task Lease + Guard.
+
+The live workflow uses:
+
+```text
+createTask()
+   |
+   v
+task.run(issue.list)
+   |
+   v
+task.authorityFrom(reviewed GitHub output)
+   |
+   v
+issue #9 becomes downstream task authority
+   |
+   +--> task.run(issue.comment #9) -> real GitHub mutation
+   +--> task.run(issue.comment #1) -> STEP-UP, zero provider mutation
+   |
+   v
+task.complete()
+   |
+   v
+issue.comment #9 -> DENY, zero provider mutation
+```
+
+Passing CI evidence from the live run:
+
+- repository root: `Null-Square/agent-authority`;
+- reviewed fixture selection: issue `#9`;
+- `task.authorityFrom()` established issue `#9` as downstream authority;
+- exactly one real GitHub comment mutation executed;
+- unrelated issue `#1` produced `authority_delta_required` before provider mutation;
+- `task.explain()` reported established authority `9` vs requested value `1`;
+- the same issue was denied after `task.complete()`;
+- provider calls before cleanup: `reads=1`, `task_mutations=1`;
+- the temporary validation comment was deleted outside the authority proof.
+
+This establishes a real-provider product proof for the facade, but it is **not yet** the full coding-agent product workflow. Branch creation, file edits and PR creation still need to be chained under task-derived authority while merge/deploy remain outside the task.
 
 ## Utility metrics
 
@@ -102,7 +146,7 @@ true authority-delta step-up rate = 100%
 unauthorized effect rate = 0%
 ```
 
-Real provider/harness benchmarks should replace or supplement the fixture as the product matures.
+The current fixture run contains 40 normal tasks and 10 unrelated-resource attempts. Real provider/harness benchmarks should replace or supplement it as the product matures.
 
 ## Three product proofs
 
@@ -119,6 +163,8 @@ repository -> issue -> task branch -> changed files -> pull request
 ```
 
 Unrelated repositories, issues, merge and deploy remain outside the task.
+
+The live issue-discovery -> exact-issue-comment proof is the first slice of this direction; it does not complete the branch/files/PR lineage yet.
 
 ### Support / communications agent
 

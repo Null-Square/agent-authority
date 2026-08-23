@@ -414,3 +414,28 @@ test('unchanged save is idempotent while expected hash permits explicit replacem
     assert.equal(store.load({ mission: m, lease_id: lease.lease_id }).status, 'completed');
   });
 });
+
+test('transaction cannot expand caller mission through a recovered lease alias', async () => {
+  await withStore(async ({ store }) => {
+    const { mission: m, lease } = await leaseWithDerivedFact();
+    const originalMission = structuredClone(m);
+    const initial = store.save(lease);
+
+    assert.throws(
+      () => store.transact({
+        mission: m,
+        lease_id: lease.lease_id,
+        expected_lease_hash: initial.lease_hash,
+        mutate: (current) => {
+          current.mission.resources[0].allow.push('item.delete');
+        }
+      }),
+      (error) => error.code === 'task_lease_snapshot_mission_mismatch'
+    );
+
+    assert.deepEqual(m, originalMission);
+    const recovered = store.load({ mission: m, lease_id: lease.lease_id });
+    assert.equal(recovered.hash(), initial.lease_hash);
+    assert.deepEqual(recovered.mission, originalMission);
+  });
+});

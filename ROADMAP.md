@@ -64,24 +64,29 @@ never silently grow
 
 The core cross-provider behavior is now implemented and exercised against connected Gmail and Calendar accounts. Public Actions reproducibility remains the final M1 evidence gate because GitHub cannot reuse an interactive ChatGPT connector credential; the manual workflow is committed and expects a refresh token stored only as repository secrets.
 
-## M2 — Durable task execution — first recovery proof established
+## M2 — Durable task execution — transactional local state established
 
 Build only what the real Task Lease workflows prove necessary.
 
 - [x] authenticated local Task Lease persistence/recovery
-- [ ] atomic fact/binding updates coupled to the running lease
+- [x] atomic authenticated fact/binding/status transaction primitive
+- [x] stale-writer compare-and-swap protection for independent recovered worker views
+- [x] local per-lease transaction lock that fails closed on overlap
+- [ ] wire ordinary running Task Lease mutations automatically through the durable transaction boundary
 - [ ] approved authority delta can safely attenuate/update a live lease
 - [x] completion state survives process restart
 - [ ] durable lineage query: why was this exact action authorized?
-- [ ] concurrency tests for multiple agent workers operating under one lease
+- [ ] multi-process stress/recovery tests for multiple agent workers operating under one lease
 
-`JsonFileTaskLeaseStore` now writes the complete lease snapshot atomically and authenticates it with a purpose-derived HMAC key from the local Agent Authority master key. Recovery verifies the envelope before authority hydration, binds the snapshot to the exact mission hash, validates status/timestamps and the authority-fact DAG, restores evidence-derived provenance hashes, and verifies the reconstructed Task Lease hash.
+`JsonFileTaskLeaseStore` writes the complete lease snapshot atomically and authenticates it with a purpose-derived HMAC key from the local Agent Authority master key. Recovery verifies the envelope before authority hydration, binds the snapshot to the exact mission hash, validates status/timestamps and the authority-fact DAG, restores evidence-derived provenance hashes, and verifies the reconstructed Task Lease hash.
 
-`test/task-lease-persistence.test.js` proves that strict derived authority survives restart without broadening, unrelated resources still require step-up, completion and expiry survive restart, edited state fails authentication, mission-ID reuse with a changed/expanded mission is rejected, and missing-parent/cyclic authority lineage fails closed.
+`JsonFileTaskLeaseStore.transact()` adds the local durable mutation boundary: acquire one per-lease filesystem lock, reload the authenticated current state, optionally compare an expected lease hash, apply one synchronous Task Lease mutation, validate the complete resulting authority graph, atomically replace the authenticated snapshot, and return the previous/new hashes. A stale worker receives `task_lease_state_conflict`; an overlapping local transaction receives `task_lease_state_locked`.
 
-This first slice deliberately keeps persistence explicit. A caller must save after a live state change; automatic/transactional coupling of every fact, binding, approval delta and side effect to durable state remains open work. See `docs/durable-task-leases.md`.
+`test/task-lease-persistence.test.js` proves that strict derived authority survives restart without broadening, unrelated resources still require step-up, completion and expiry survive restart, edited state fails authentication, mission-ID reuse with a changed/expanded mission is rejected, bad lineage fails closed, a fact plus binding can commit as one snapshot, stale worker views cannot overwrite newer authority, raw changed saves cannot bypass CAS, and failed/async transactions leave durable state unchanged.
 
-**Success criterion:** a Task Lease survives daemon/process restarts without gaining authority or losing its provenance lineage. The authenticated single-host recovery portion is now demonstrated; transactional mutation persistence and multi-worker concurrency remain open.
+The transaction primitive is explicit in this slice. Existing callers can still mutate an in-memory Task Lease directly; durable applications should perform authority-state changes through `transact()` or an expected-hash save. The next M2 slice should make the normal running lease/session mutation surface use this transaction boundary automatically. See `docs/durable-task-leases.md`.
+
+**Success criterion:** a Task Lease survives daemon/process restarts without gaining authority or losing provenance, and cooperating local workers cannot silently overwrite a newer authority state. Authenticated recovery and the local transaction/CAS primitive are now demonstrated; automatic session coupling, approved deltas, and stronger multi-process stress remain open.
 
 ## M3 — Trustworthy derived facts — two-provider proof established
 

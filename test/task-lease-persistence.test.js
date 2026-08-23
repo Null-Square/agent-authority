@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -229,4 +229,213 @@ test('snapshot restoration rejects authority facts with missing lineage or cycle
 test('default config reserves authenticated Task Lease state directory', () => {
   const config = defaultConfig('/tmp/agent-authority-config-test');
   assert.equal(config.paths.task_leases, '/tmp/agent-authority-config-test/state/task-leases');
+});
+
+test('transaction atomically persists authority fact and binding updates', async () => {
+  await withStore(async ({ store }) => {
+    const { mission: m, lease } = await leaseWithDerivedFact();
+    const initial = store.save(lease);
+
+    const updated = store.transact({
+      mission: m,
+      lease_id: lease.lease_id,
+      expected_lease_hash: initial.lease_hash,
+      mutate: (current) => {
+        current.addRoot({ fact_id: 'fact:region', kind: 'demo.region', value: 'us-east' });
+        current.bind({
+          service: 'demo',
+          action: 'item.access',
+          context_field: 'region',
+          fact_id: 'fact:region'
+        });
+        return { updated: ['fact:region', 'binding:region'] };
+      }
+    });
+
+    assert.notEqual(updated.lease_hash, initial.lease_hash);
+    assert.equal(updated.previous_lease_hash, initial.lease_hash);
+    assert.deepEqual(updated.value, { updated: ['fact:region', 'binding:region'] });
+
+    const recovered = store.load({ mission: m, lease_id: lease.lease_id });
+    assert.equal(recovered.hash(), updated.lease_hash);
+    assert.equal(recovered.fact('fact:region').value, 'us-east');
+
+    const runtime = new AuthorityRuntime();
+    const allowed = recovered.evaluate(runtime, {
+      service: 'demo', action: 'item.access', context: { item: 'alpha', region: 'us-east' }
+    });
+    assert.equal(allowed.result.decision, 'allow');
+
+    const wrongRegion = recovered.evaluate(runtime, {
+      service: 'demo', action: 'item.access', context: { item: 'alpha', region: 'eu-west' }
+    });
+    assert.equal(wrongRegion.result.decision, 'require_approval');
+    assert.equal(wrongRegion.result.code, 'authority_delta_required');
+  });
+});
+
+test('stale recovered worker cannot overwrite a newer durable Task Lease', async () => {
+  await withStore(async ({ store }) => {
+    const { mission: m, lease } = await leaseWithDerivedFact();
+    const initial = store.save(lease);
+    const workerA = store.load({ mission: m, lease_id: lease.lease_id });
+    const workerB = store.load({ mission: m, lease_id: lease.lease_id });
+    assert.equal(workerA.hash(), initial.lease_hash);
+    assert.equal(workerB.hash(), initial.lease_hash);
+
+    const committed = store.transact({
+      mission: m,
+      lease_id: lease.lease_id,
+      expected_lease_hash: workerA.hash(),
+      mutate: (current) => current.bind({
+        service: 'demo', action: 'item.access', context_field: 'catalog', fact_id: 'fact:catalog'
+      })
+    });
+    assert.notEqual(committed.lease_hash, initial.lease_hash);
+
+    assert.throws(
+      () => store.transact({
+        mission: m,
+        lease_id: lease.lease_id,
+        expected_lease_hash: workerB.hash(),
+        mutate: (current) => current.complete('stale worker must not win')
+      }),
+      (error) => error.code === 'task_lease_state_conflict'
+        && error.expected_lease_hash === initial.lease_hash
+        && error.current_lease_hash === committed.lease_hash
+    );
+
+    const recovered = store.load({ mission: m, lease_id: lease.lease_id });
+    assert.equal(recovered.status, 'active');
+    assert.equal(recovered.hash(), committed.lease_hash);
+  });
+});
+
+test('changed raw save cannot bypass durable compare-and-swap protection', async () => {
+  await withStore(async ({ store }) => {
+    const { mission: m, lease } = await leaseWithDerivedFact();
+    const initial = store.save(lease);
+    const stale = store.load({ mission: m, lease_id: lease.lease_id });
+
+    const committed = store.transact({
+      mission: m,
+      lease_id: lease.lease_id,
+      expected_lease_hash: initial.lease_hash,
+      mutate: (current) => current.complete('authoritative completion')
+    });
+
+    stale.bind({
+      service: 'demo', action: 'item.access', context_field: 'catalog', fact_id: 'fact:catalog'
+    });
+    assert.throws(
+      () => store.save(stale),
+      (error) => error.code === 'task_lease_state_conflict'
+        && error.current_lease_hash === committed.lease_hash
+    );
+
+    const recovered = store.load({ mission: m, lease_id: lease.lease_id });
+    assert.equal(recovered.status, 'completed');
+    assert.equal(recovered.completion_reason, 'authoritative completion');
+  });
+});
+
+test('transaction lock fails closed instead of racing another local worker', async () => {
+  await withStore(async ({ store }) => {
+    const { mission: m, lease } = await leaseWithDerivedFact();
+    store.save(lease);
+    mkdirSync(store.lockPath(lease.lease_id), { mode: 0o700 });
+    try {
+      assert.throws(
+        () => store.transact({
+          mission: m,
+          lease_id: lease.lease_id,
+          mutate: (current) => current.complete('must not run while locked')
+        }),
+        (error) => error.code === 'task_lease_state_locked'
+      );
+    } finally {
+      rmSync(store.lockPath(lease.lease_id), { recursive: true, force: true });
+    }
+
+    const recovered = store.load({ mission: m, lease_id: lease.lease_id });
+    assert.equal(recovered.status, 'active');
+  });
+});
+
+test('failed or asynchronous durable mutation leaves authenticated state unchanged', async () => {
+  await withStore(async ({ store }) => {
+    const { mission: m, lease } = await leaseWithDerivedFact();
+    const initial = store.save(lease);
+
+    assert.throws(
+      () => store.transact({
+        mission: m,
+        lease_id: lease.lease_id,
+        expected_lease_hash: initial.lease_hash,
+        mutate: (current) => {
+          current.complete('rolled back');
+          throw new Error('mutation failed');
+        }
+      }),
+      /mutation failed/
+    );
+    assert.equal(store.load({ mission: m, lease_id: lease.lease_id }).hash(), initial.lease_hash);
+
+    assert.throws(
+      () => store.transact({
+        mission: m,
+        lease_id: lease.lease_id,
+        expected_lease_hash: initial.lease_hash,
+        mutate: (current) => {
+          current.complete('async transaction must not persist');
+          return { then() {} };
+        }
+      }),
+      (error) => error.code === 'task_lease_transaction_async_unsupported'
+    );
+
+    const recovered = store.load({ mission: m, lease_id: lease.lease_id });
+    assert.equal(recovered.hash(), initial.lease_hash);
+    assert.equal(recovered.status, 'active');
+  });
+});
+
+test('unchanged save is idempotent while expected hash permits explicit replacement', async () => {
+  await withStore(async ({ store }) => {
+    const { mission: m, lease } = await leaseWithDerivedFact();
+    const initial = store.save(lease);
+    const recovered = store.load({ mission: m, lease_id: lease.lease_id });
+
+    assert.deepEqual(store.save(recovered), initial);
+
+    recovered.complete('explicit compare-and-swap save');
+    const saved = store.save(recovered, { expected_lease_hash: initial.lease_hash });
+    assert.notEqual(saved.lease_hash, initial.lease_hash);
+    assert.equal(store.load({ mission: m, lease_id: lease.lease_id }).status, 'completed');
+  });
+});
+
+test('transaction cannot expand caller mission through a recovered lease alias', async () => {
+  await withStore(async ({ store }) => {
+    const { mission: m, lease } = await leaseWithDerivedFact();
+    const originalMission = structuredClone(m);
+    const initial = store.save(lease);
+
+    assert.throws(
+      () => store.transact({
+        mission: m,
+        lease_id: lease.lease_id,
+        expected_lease_hash: initial.lease_hash,
+        mutate: (current) => {
+          current.mission.resources[0].allow.push('item.delete');
+        }
+      }),
+      (error) => error.code === 'task_lease_snapshot_mission_mismatch'
+    );
+
+    assert.deepEqual(m, originalMission);
+    const recovered = store.load({ mission: m, lease_id: lease.lease_id });
+    assert.equal(recovered.hash(), initial.lease_hash);
+    assert.deepEqual(recovered.mission, originalMission);
+  });
 });

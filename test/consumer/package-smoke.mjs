@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { AuthorityRuntime } from '@nullsquare/agent-authority';
 import { createExecutionEvidence } from '@nullsquare/agent-authority/authority-evidence';
+import { ExecutingAuthorityRuntime } from '@nullsquare/agent-authority/execution';
 import {
   AuthorityApprovalRequiredError,
   AuthorityDeniedError,
   createTaskLeaseGuard
 } from '@nullsquare/agent-authority/guard';
 import { protectAiSdkTools } from '@nullsquare/agent-authority/integrations/ai-sdk';
+import { MissionMcpGateway } from '@nullsquare/agent-authority/mcp-gateway';
 import { githubIssueListSelectedNumberAuthorityExtractor } from '@nullsquare/agent-authority/providers/github';
 import { gmailThreadSenderAuthorityExtractor } from '@nullsquare/agent-authority/providers/google';
 import { createTaskLease } from '@nullsquare/agent-authority/task-lease';
@@ -14,6 +16,8 @@ import { createTaskLease } from '@nullsquare/agent-authority/task-lease';
 assert.equal(typeof createExecutionEvidence, 'function');
 assert.equal(typeof gmailThreadSenderAuthorityExtractor, 'function');
 assert.equal(typeof githubIssueListSelectedNumberAuthorityExtractor, 'function');
+assert.equal(typeof ExecutingAuthorityRuntime.prototype.executeTaskLease, 'function');
+assert.equal(typeof MissionMcpGateway, 'function');
 
 const mission = {
   version: '0.1',
@@ -89,6 +93,6 @@ await assert.rejects(
 assert.equal(effects, 1);
 
 console.log('PASS -> packed package imported only through public exports');
-console.log('PASS -> authority evidence plus Google and GitHub extractor exports are present');
+console.log('PASS -> evidence, provider extractor and transport-invariance exports are present');
 console.log('PASS -> authorized effect executed exactly once');
 console.log('PASS -> unrelated and post-completion effects executed zero times');

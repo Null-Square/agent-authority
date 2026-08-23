@@ -8,9 +8,9 @@
 
 **Agent Authority turns a human-approved task into temporary execution authority, then keeps that authority bounded as the agent discovers resources, crosses tools, and performs side effects.**
 
-[Task Leases](docs/task-leases.md) · [Executable evidence](docs/evidence.md) · [Extractor conformance](docs/authority-extractor-conformance.md) · [Google proof](docs/live-google-validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Task Leases](docs/task-leases.md) · [Executable evidence](docs/evidence.md) · [Extractor conformance](docs/authority-extractor-conformance.md) · [Transport invariance](docs/transport-invariance.md) · [Google proof](docs/live-google-validation.md) · [Integration contract](docs/integration-contract.md) · [CLI](docs/cli.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-> **Status: public pre-alpha / v0.4.3 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype, execution-bound derived facts, reviewed Google and GitHub authority extractors, two-provider conformance tests, approvals, revocation, idempotency, credential isolation, MCP v2 gateway, live GitHub proofs, CI and CodeQL. It is not production-ready yet.
+> **Status: public pre-alpha / v0.4.4 Developer Preview.** Published on npm as `@nullsquare/agent-authority`. The repository has a working policy runtime, protocol-neutral guard, Task Lease prototype, execution-bound derived facts, reviewed Google and GitHub authority extractors, two-provider conformance tests, Task-Lease-aware SDK/MCP/broker execution, approvals, revocation, idempotency, credential isolation, live GitHub proofs, CI and CodeQL. It is not production-ready yet.
 
 </div>
 
@@ -160,7 +160,9 @@ The side-effect callbacks for blocked actions never run.
 
 The repository also includes a real Gmail → Calendar validation path and a reusable Google provider adapter. The strict path binds the derived sender to the exact guarded output before it becomes authority. See [Live Gmail → Calendar validation](docs/live-google-validation.md) and [Executable Evidence](docs/evidence.md).
 
-v0.4.3 applies the **same primitive to GitHub**: a root-bound repository + fixture marker are used by the reviewed GitHub adapter to select one issue from a real `issue.list` response; `deriveFromEvidence()` establishes that exact issue number as downstream authority; one real comment mutation succeeds; unrelated and post-completion issue mutations never reach the provider. Google and GitHub are now exercised by the same [authority extractor conformance contract](docs/authority-extractor-conformance.md).
+v0.4.3 applied the **same evidence-derived authority primitive to GitHub**: a root-bound repository + fixture marker are used by the reviewed GitHub adapter to select one issue from a real `issue.list` response; `deriveFromEvidence()` establishes that exact issue number as downstream authority; one real comment mutation succeeds; unrelated and post-completion issue mutations never reach the provider. Google and GitHub are exercised by the same [authority extractor conformance contract](docs/authority-extractor-conformance.md).
+
+v0.4.4 adds the first **transport-invariance proof**: one `execution-evidence-v1` derived fact is established under one Task Lease, then that exact lease and fact constrain ordinary `guard.run()`, the MCP gateway and brokered provider execution. The same allowed resource succeeds, an unrelated resource produces `authority_delta_required` with zero blocked callbacks/provider calls, and task completion produces `task_lease_completed` across all three paths. See [Task Lease transport invariance](docs/transport-invariance.md).
 
 ## Minimal developer API
 
@@ -230,7 +232,7 @@ Agent Authority is deliberately **not tied to MCP, OAuth, or one agent framework
 agent code -> guard.run() -> existing SDK / API
 ```
 
-Best when the application already owns the provider connection. This is the primary v0.4 adoption path.
+Best when the application already owns the provider connection.
 
 ### 2. MCP gateway
 
@@ -248,7 +250,7 @@ agent -> Agent Authority -> isolated credential -> provider
 
 Best when the agent should not receive the provider credential at all.
 
-The long-term validation target is the **same Task Lease and authority lineage across all three paths**.
+v0.4.4 demonstrates the **same Task Lease and authority fact across all three paths in-process**. The remaining M4 target is a real non-bypassable external harness/tool-middleware integration.
 
 ## What is implemented
 
@@ -280,6 +282,10 @@ The long-term validation target is the **same Task Lease and authority lineage a
 - protocol-neutral `guard.run()` wrapper
 - blocked side effects never invoke their callback
 - successful guarded effects return separate execution evidence
+- Task-Lease-aware MCP gateway/proxy evaluation
+- Task-Lease-aware brokered execution via `ExecutingAuthorityRuntime.executeTaskLease()`
+- brokered execution evidence bound to Task-Lease receipts
+- SDK/MCP/broker transport-invariance conformance test
 - one-time human approvals bound to exact request
 - mutation idempotency
 - conservative uncertain-state handling
@@ -302,6 +308,7 @@ The long-term validation target is the **same Task Lease and authority lineage a
 - adversarial authorization tests
 - execution-evidence substitution, tampering, replay, cross-lease and selector tests
 - the same provider-derived-authority conformance attacks against Google and GitHub
+- cross-transport invariance test for direct SDK, MCP and brokered execution
 - Node 20 and Node 22 CI
 - coverage run
 - package checks
@@ -377,6 +384,7 @@ See [SECURITY.md](SECURITY.md).
 This is still a validation implementation.
 
 - Task Lease state is currently process-local.
+- The SDK/MCP/broker transport-invariance proof is currently in-process; a real external non-bypassable harness/tool-middleware integration remains open.
 - `deriveFromEvidence()` proves consistency with the exact output returned through the trusted Agent Authority guard, but the output is not cryptographically attested by Gmail, GitHub, or another remote provider.
 - The legacy `derive()` API remains host-trusted for compatibility; audit provenance distinguishes it from `execution-evidence-v1` derivation.
 - Source-data changes do not yet automatically invalidate already-derived authority facts.

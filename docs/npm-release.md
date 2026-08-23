@@ -13,24 +13,26 @@ Before any publication:
 After publication, verify from a fresh project with:
 
 ```bash
-npm install @nullsquare/agent-authority@0.4.3
+npm install @nullsquare/agent-authority@0.4.4
 ```
 
 Then run the same consumer smoke flow through the registry-installed package. Registry verification is part of the release gate; a successful `npm publish` command alone is not sufficient.
 
-The repository also includes `.github/workflows/verify-npm-registry.yml`, which verifies registry visibility and a clean consumer install. For v0.4.3 it additionally verifies the public `@nullsquare/agent-authority/authority-evidence` API plus both reviewed provider authority extractors:
+The repository also includes `.github/workflows/verify-npm-registry.yml`, which verifies registry visibility and a clean consumer install. For v0.4.4 it verifies the public execution-evidence and two-provider authority-extractor APIs plus the Task-Lease-aware transport surfaces:
 
 - `gmailThreadSenderAuthorityExtractor` from `@nullsquare/agent-authority/providers/google`;
-- `githubIssueListSelectedNumberAuthorityExtractor` from `@nullsquare/agent-authority/providers/github`.
+- `githubIssueListSelectedNumberAuthorityExtractor` from `@nullsquare/agent-authority/providers/github`;
+- `ExecutingAuthorityRuntime.executeTaskLease()` from `@nullsquare/agent-authority/execution`;
+- `MissionMcpGateway` from `@nullsquare/agent-authority/mcp-gateway`.
 
-This makes the registry artifact verification cover the same two-provider execution-evidence surface exercised by the repository conformance suite.
+This makes the registry artifact verification cover both the two-provider execution-evidence surface and the SDK/MCP/broker transport-invariance surface exercised by the repository conformance tests.
 
 ## npm vs GitHub release surfaces
 
 Publishing to the public npm registry does not automatically create either a GitHub Release or a GitHub Packages entry.
 
 - **npm registry** — `npm publish --access public` publishes `@nullsquare/agent-authority` to `registry.npmjs.org` / npmjs.com. This is the package users install with `npm install`.
-- **GitHub Releases** — a separate GitHub object, normally backed by a Git tag such as `v0.4.3`. A release must be created explicitly or by release automation.
+- **GitHub Releases** — a separate GitHub object, normally backed by a Git tag such as `v0.4.4`. A release must be created explicitly or by release automation.
 - **GitHub Packages** — a separate package registry. It only appears when the package is published to GitHub's npm registry (`npm.pkg.github.com`); publishing to npmjs.com does not populate it.
 
 Agent Authority currently uses npmjs.com as its public package registry. Therefore an empty GitHub **Packages** section is expected unless the project intentionally adopts dual publication. A GitHub **Release** is still useful for source-release discoverability and should track published versions, but it is independent from npm publication.

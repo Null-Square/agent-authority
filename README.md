@@ -8,7 +8,7 @@
 
 **Agent Authority is a small execution layer that lets an agent use existing account permissions only for the task the user actually gave it.**
 
-[Task-first API](#task-first-api) · [Product proof gate](docs/product-proof.md) · [Task Leases](docs/task-leases.md) · [Durability](docs/durable-task-leases.md) · [Evidence](docs/evidence.md) · [Transport invariance](docs/transport-invariance.md) · [Roadmap](ROADMAP.md)
+[Quickstart](docs/quickstart.md) · [Task-first API](#task-first-api) · [Product proof gate](docs/product-proof.md) · [Task Leases](docs/task-leases.md) · [Durability](docs/durable-task-leases.md) · [Evidence](docs/evidence.md) · [Transport invariance](docs/transport-invariance.md) · [Roadmap](ROADMAP.md)
 
 > **Status: public pre-alpha / v0.4.6 Developer Preview on npm.** The task-first API is published as `@nullsquare/agent-authority/task`. Agent Authority is not production-ready yet.
 
@@ -55,6 +55,33 @@ Requires Node.js 20+.
 ```bash
 npm install @nullsquare/agent-authority
 ```
+
+## Fresh-install quickstart
+
+You can see the task-authority model without a repository checkout, provider credential, OAuth setup, custom extractor, or Mission JSON.
+
+```bash
+mkdir agent-authority-quickstart
+cd agent-authority-quickstart
+npm init -y
+npm install @nullsquare/agent-authority
+curl -fsSL https://raw.githubusercontent.com/Null-Square/agent-authority/main/examples/quickstart.mjs -o quickstart.mjs
+node quickstart.mjs
+```
+
+Expected shape:
+
+```text
+ALLOW -> task discovered issue #42 and the exact comment effect ran
+STEP-UP -> The task established authority for 42 but this action requested 7.
+PASS -> useful task work ran; unrelated standing permission did not become task authority
+```
+
+The quickstart uses the real published `createTask()` API and reviewed GitHub authority extractor. Only the provider callback is a local provider-shaped fixture so the first run needs no account.
+
+An automated blank-project gate independently installed `@nullsquare/agent-authority@0.4.6` from npm on Node 20 and ran this exact file successfully. That proves the current published package supports the documented path; it does **not** replace the still-open first-time-human under-10-minute adoption test.
+
+See [Fresh-install quickstart](docs/quickstart.md).
 
 ## Task-first API
 
@@ -305,6 +332,8 @@ See [Durable Task Leases](docs/durable-task-leases.md).
 - stale-writer/CAS and mission-alias protection;
 - automatic durable Task Lease sessions;
 - task-first public facade and deterministic utility regression gate;
+- self-contained support/communications and operations/finance product proofs;
+- blank-project quickstart against the current npm package;
 - Node 20/22 CI, coverage, packed-consumer validation and CodeQL;
 - independent npm registry consumer verification.
 
@@ -335,6 +364,7 @@ This is still a validation implementation.
 - Provider outputs are evidence-bound inside the trusted Agent Authority runtime but are not provider-signed remote attestations.
 - Source-data changes do not yet automatically invalidate already-derived authority.
 - Approved authority deltas are surfaced but not automatically applied into a live durable task.
+- Current Task Lease bindings are exact equality. The finance proof therefore steps up for a partial refund as well as an over-refund; a derived numeric ceiling remains an evidence-driven product question rather than a general policy language.
 - GitHub token-stdin and the local encrypted vault are developer bridges, not final production OAuth/KMS UX.
 - Remote authenticated deployment and production approval UX remain incomplete.
 

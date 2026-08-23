@@ -8,9 +8,9 @@
 
 **Agent Authority is a small execution layer that lets an agent use existing account permissions only for the task the user actually gave it.**
 
-[Quickstart](docs/quickstart.md) · [Task-first API](#task-first-api) · [Product proof gate](docs/product-proof.md) · [Task Leases](docs/task-leases.md) · [Durability](docs/durable-task-leases.md) · [Evidence](docs/evidence.md) · [Transport invariance](docs/transport-invariance.md) · [Roadmap](ROADMAP.md)
+[Quickstart](docs/quickstart.md) · [Connected GitHub](docs/connected-github.md) · [Task-first API](#task-first-api) · [Product proof gate](docs/product-proof.md) · [Task Leases](docs/task-leases.md) · [Durability](docs/durable-task-leases.md) · [Evidence](docs/evidence.md) · [Transport invariance](docs/transport-invariance.md) · [Roadmap](ROADMAP.md)
 
-> **Status: public pre-alpha / v0.4.6 Developer Preview on npm.** The task-first API is published as `@nullsquare/agent-authority/task`. Agent Authority is not production-ready yet.
+> **Status: public pre-alpha / v0.4.7 Developer Preview on npm.** The task-first API is published as `@nullsquare/agent-authority/task`. Agent Authority is not production-ready yet.
 
 </div>
 
@@ -79,7 +79,7 @@ PASS -> useful task work ran; unrelated standing permission did not become task 
 
 The quickstart uses the real published `createTask()` API and reviewed GitHub authority extractor. Only the provider callback is a local provider-shaped fixture so the first run needs no account.
 
-An automated blank-project gate independently installed `@nullsquare/agent-authority@0.4.6` from npm on Node 20 and ran this exact file successfully. That proves the current published package supports the documented path; it does **not** replace the still-open first-time-human under-10-minute adoption test.
+The fresh-install path is continuously checked from blank Node 20 consumers against the public npm package. That proves the published package supports the documented task-first surface; it does **not** replace the still-open first-time-human under-10-minute adoption test.
 
 ### Next: make one real GitHub call, still with no credential
 
@@ -103,9 +103,51 @@ PASS -> broader standing repo.read permission could not reach an unrelated repos
 
 This deliberately models the account/app capability as broader than the task. Mission-level `repo.read` can read repositories generally, while the Task authority root allows this task to reach only `Null-Square/agent-authority`. The first request makes one real public GitHub `fetch()`; the unrelated repository is stopped before a second network call.
 
-A separate blank-project CI gate has passed this exact live path against npm `0.4.6`. Authenticated/private-repository onboarding remains separate follow-on work.
+### Then: connect GitHub without putting the credential in task context
 
-See [Fresh-install quickstart](docs/quickstart.md).
+v0.4.7 adds the connected-provider task path. Initialize the local runtime and pipe a GitHub credential on stdin:
+
+```bash
+npx agent-authority setup
+printf %s "$GITHUB_TOKEN" | npx agent-authority connect github --token-stdin
+```
+
+Then an application can use the same task-first surface with broker-owned provider execution:
+
+```js
+import { createRuntimeEnvironment } from '@nullsquare/agent-authority/runtime-env';
+import { createTask } from '@nullsquare/agent-authority/task';
+
+const env = createRuntimeEnvironment();
+
+const task = createTask({
+  principal: env.config.principal_id,
+  agent: 'agent:assistant',
+  request: 'Inspect only acme/private',
+  permissions: {
+    github: { allow: ['repo.read'], constraints: {} }
+  },
+  authority: {
+    repository: { kind: 'github.repository', value: 'acme/private' }
+  },
+  bindings: [
+    { service: 'github', action: 'repo.read', field: 'repository', authority: 'repository' }
+  ],
+  runtime: env.runtime
+});
+
+const result = await task.execute({
+  service: 'github',
+  action: 'repo.read',
+  context: { repository: 'acme/private' }
+});
+```
+
+`task.run(request, callback)` is for application-owned SDK/provider effects. `task.execute(request)` is for Agent Authority connected-provider execution, where credential resolution stays behind the broker boundary. Both use the same Task Lease semantics and the same deny/step-up error model.
+
+The connected GitHub CI proof packs the candidate into a fresh Node 20 consumer, creates a fresh Agent Authority home, pipes the repository's GitHub Actions installation token through stdin, confirms no plaintext token appears under the home, executes one authorized live GitHub request, and blocks an unrelated repository at the Task Lease. A fine-grained PAT or GitHub App token can use the same path for repositories that credential is allowed to access. Public CI does **not** claim independent access to an unrelated private repository.
+
+See [Fresh-install quickstart](docs/quickstart.md) and [Connected GitHub](docs/connected-github.md).
 
 ## Task-first API
 
@@ -194,6 +236,8 @@ Example output:
 ```text
 The task established authority for 42 but this action requested 7.
 ```
+
+For a connected provider, the same error/explanation flow applies to `task.execute(request)`. Successful connected execution also returns an ALLOW receipt and execution evidence, so reviewed provider outputs can feed `task.authorityFrom()` without copying the provider credential into the task.
 
 The task-first API is a facade over the existing Mission, Task Lease, execution-evidence and guard primitives. It does not weaken or replace them.
 
@@ -313,7 +357,7 @@ MCP gateway
 brokered provider execution
 ```
 
-A real Vercel AI SDK `ToolLoopAgent` integration also exercises the protected-tool boundary. See [Transport invariance](docs/transport-invariance.md).
+The task-first facade can now use both application-owned execution (`task.run`) and broker-owned connected execution (`task.execute`) without changing the underlying Task Lease. A real Vercel AI SDK `ToolLoopAgent` integration also exercises the protected-tool boundary. See [Transport invariance](docs/transport-invariance.md) and [Connected execution](docs/connected-execution-api.md).
 
 ## Durability
 
@@ -357,10 +401,12 @@ See [Durable Task Leases](docs/durable-task-leases.md).
 - automatic durable Task Lease sessions;
 - task-first public facade and deterministic utility regression gate;
 - self-contained support/communications and operations/finance product proofs;
-- blank-project fixture quickstart against the current npm package;
+- blank-project fixture quickstart against the public npm package;
 - blank-project real public GitHub onboarding with broader standing permission and narrower task authority;
+- encrypted connected-GitHub onboarding through `task.execute()` with the credential kept broker-internal;
+- safe sole-account default resolution while multiple connected accounts remain explicit/fail closed;
 - Node 20/22 CI, coverage, packed-consumer validation and CodeQL;
-- independent npm registry consumer verification.
+- independent npm registry consumer verification, including v0.4.7 connected execution.
 
 The lower-level evidence is documented under `docs/` and remains available for security review.
 
@@ -390,7 +436,8 @@ This is still a validation implementation.
 - Source-data changes do not yet automatically invalidate already-derived authority.
 - Approved authority deltas are surfaced but not automatically applied into a live durable task.
 - Current Task Lease bindings are exact equality. The finance proof therefore steps up for a partial refund as well as an over-refund; a derived numeric ceiling remains an evidence-driven product question rather than a general policy language.
-- Public GitHub onboarding is credential-free for read-only public repositories; authenticated/private-repository onboarding and production OAuth/KMS UX remain incomplete.
+- The local encrypted credential vault and stdin GitHub connection are trusted-host developer onboarding, not production OAuth/KMS credential lifecycle.
+- Public CI proves authenticated connected execution against the current repository but does not independently demonstrate access to an unrelated private repository.
 - Remote authenticated deployment and production approval UX remain incomplete.
 
 These are real limitations. They are not reasons to build every possible infrastructure layer before product adoption is proven.

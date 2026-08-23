@@ -1,0 +1,40 @@
+name: Verify AgentDojo oracle mapping
+
+on:
+  pull_request:
+    paths:
+      - benchmarks/agentdojo/**
+      - src/task.js
+      - src/task-lease.js
+      - src/guard.js
+      - .github/workflows/verify-agentdojo-oracle.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  slack-oracle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install AgentDojo research dependency
+        run: python -m pip install -r benchmarks/agentdojo/requirements.txt
+
+      - name: Install Agent Authority dependencies
+        run: npm install --ignore-scripts
+
+      - name: Extract AgentDojo Slack ground truth
+        run: python benchmarks/agentdojo/extract_slack_ground_truth.py > /tmp/agentdojo-slack.json
+
+      - name: Run oracle authority mapping benchmark
+        run: node benchmarks/agentdojo/slack_oracle.mjs /tmp/agentdojo-slack.json

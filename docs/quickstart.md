@@ -121,15 +121,18 @@ The live GitHub quickstart shows the even simpler direct-boundary case: an appli
 
 The credential-free fixture is an **adoption quickstart**, not a live-provider security proof. The live GitHub quickstart is a real-provider onboarding proof, but it is read-only and uses a public repository by default.
 
-Separate repository evidence already covers:
+Separate repository evidence covers:
 
 - a real GitHub issue discovery -> exact issue comment mutation through the task-first API;
 - Gmail sender -> Calendar attendee authority;
+- coding-agent issue -> branch -> exact file path -> draft PR lineage;
+- bounded finance refund authority;
 - SDK, MCP and broker transport invariance;
-- durable local Task Lease recovery/session behavior;
-- adversarial execution-evidence tests.
+- authenticated durable local Task Lease recovery;
+- adversarial execution-evidence and typed-relation tests;
+- pinned AgentDojo oracle validation.
 
-The public Gmail -> Calendar GitHub Actions proof remains separately gated on repository Google OAuth secrets. Authenticated/private-repository onboarding and production OAuth/KMS UX also remain separate product work.
+The public Gmail -> Calendar GitHub Actions proof remains separately gated on repository Google OAuth secrets. Production OAuth/KMS onboarding and hardened remote deployment also remain separate product work.
 
 ## Automated fresh-install gates
 
@@ -144,4 +147,4 @@ The public Gmail -> Calendar GitHub Actions proof remains separately gated on re
 
 `.github/workflows/verify-live-quickstart.yml` repeats the real-provider path from another blank Node 20 project and requires exactly one live GitHub request before the unrelated repository is blocked.
 
-Both gates have passed against `@nullsquare/agent-authority@0.4.6`. They catch documentation/example drift against the actually published package. They do **not** substitute for timing a first-time external developer, so the roadmap's under-10-minute human adoption gate remains open until that evidence exists.
+Both workflows are continuously exercised in pull requests and against the published package path. They catch documentation/example drift, but they do **not** substitute for timing a first-time external developer. The under-10-minute human adoption gate remains open until issue #43 receives independent evidence.

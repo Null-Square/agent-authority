@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Extract a small, representative AgentDojo Slack task set without running an LLM.
 
-This script deliberately uses AgentDojo's own task objects and default environment.
-The resulting JSON is an oracle/upper-bound input for the Agent Authority mapping
-benchmark. It is not a model-in-the-loop security result.
+This script deliberately uses AgentDojo's own task registry, task objects and
+versioned default environment. The resulting JSON is an oracle/upper-bound input
+for the Agent Authority mapping benchmark. It is not a model-in-the-loop security
+result.
 """
 
 from __future__ import annotations
@@ -12,14 +13,12 @@ import argparse
 import json
 from typing import Any
 
-# Import the v1 task registrations first, then the v1.2 updates. Slack has no
-# v1.2.1/v1.2.2 task overrides, so selecting benchmark_version=(1, 2, 2)
-# yields the v1.2.2-compatible Slack task set.
-import agentdojo.default_suites.v1.slack.user_tasks  # noqa: F401
-import agentdojo.default_suites.v1_2.slack.user_tasks  # noqa: F401
-from agentdojo.default_suites.v1.slack.task_suite import task_suite
+# Use AgentDojo's public suite loader rather than importing the Slack registration
+# modules directly. Direct imports can trigger a circular import while AgentDojo's
+# version registry is still registering task-suite updates.
+from agentdojo.task_suite.load_suites import get_suite
 
-BENCHMARK_VERSION = (1, 2, 2)
+BENCHMARK_VERSION = "v1.2.2"
 DEFAULT_TASKS = (5, 6, 7, 8, 11)
 
 
@@ -37,7 +36,7 @@ def main() -> None:
     args = parser.parse_args()
 
     selected = [int(value.strip()) for value in args.tasks.split(",") if value.strip()]
-    suite = task_suite.get_new_version(BENCHMARK_VERSION)
+    suite = get_suite(BENCHMARK_VERSION, "slack")
     pre_environment = suite.load_and_inject_default_environment({})
 
     tasks: list[dict[str, Any]] = []
@@ -58,7 +57,7 @@ def main() -> None:
             {
                 "benchmark": "AgentDojo",
                 "agentdojo_package": "0.1.35",
-                "benchmark_version": "v1.2.2",
+                "benchmark_version": BENCHMARK_VERSION,
                 "suite": "slack",
                 "mode": "oracle-ground-truth-extraction",
                 "tasks": tasks,

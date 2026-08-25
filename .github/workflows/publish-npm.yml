@@ -32,6 +32,7 @@ jobs:
           npm run test:ai-sdk
           npm run demo:task
           npm run demo:task-coding
+          npm run demo:task-finance
           npm run benchmark:task
           npm run demo:task-lease
           npm run check:syntax
@@ -52,7 +53,7 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish public Developer Preview with provenance
+      - name: Publish public Community Preview with provenance
         if: steps.package.outputs.published != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -86,6 +87,7 @@ jobs:
           cp test/consumer/package-smoke.mjs "$CONSUMER/package-smoke.mjs"
           cp test/consumer/connected-smoke.mjs "$CONSUMER/connected-smoke.mjs"
           cp test/consumer/coding-smoke.mjs "$CONSUMER/coding-smoke.mjs"
+          cp test/consumer/task-types-smoke.ts "$CONSUMER/task-types-smoke.ts"
           cd "$CONSUMER"
           npm init -y >/dev/null
           npm install "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" --ignore-scripts
@@ -96,3 +98,5 @@ jobs:
           node package-smoke.mjs
           node connected-smoke.mjs
           node coding-smoke.mjs
+          npm install --no-save --package-lock=false --ignore-scripts typescript@5.9.2
+          npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext task-types-smoke.ts

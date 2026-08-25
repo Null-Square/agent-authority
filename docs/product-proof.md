@@ -1,32 +1,26 @@
 # Product proof gate
 
-Agent Authority has enough security machinery to validate its core thesis. The next risk is no longer "can we make the invariant stronger?" It is "will an agent developer actually install and keep this layer?"
+Agent Authority has enough authorization machinery. The product risk is now whether developers can use the mechanism in real agents without losing useful autonomy or misunderstanding the trust boundary.
 
 The product thesis is:
 
 > **Your agent may use the permissions it already has only for the task the user actually gave it.**
 
-The differentiated mechanism is narrower:
+The differentiated mechanism is:
 
-> **Authority may follow exact resources discovered through already-authorized execution, without turning those resources into standing account permissions.**
-
-Everything else in the repository exists to make those two statements true.
+> **Authority may follow task resources discovered through already-authorized execution, while remaining narrower than standing account authority.**
 
 ## Developer mental model
 
-The preferred public experience should stay close to three concepts:
+The preferred public experience stays close to three concepts:
 
 ```text
 Task -> Effect -> Authority
 ```
 
-A developer should not need to understand Mission internals, Task Lease hashing, execution evidence envelopes, CAS persistence or transport adapters before getting value.
-
-Those primitives remain available for advanced integrations and audits.
+A developer should not need Mission internals, Task Lease hashing, evidence envelopes, CAS persistence or transport mechanics before getting value. Those primitives remain available for advanced integrations and audits.
 
 ## Product-facing API
-
-The task-first facade intentionally composes the existing primitives instead of replacing them:
 
 ```js
 import { createTask } from '@nullsquare/agent-authority/task';
@@ -59,152 +53,160 @@ task.bind({
   service: 'github',
   action: 'issue.comment',
   field: 'issue_number',
-  authority: 'issue'
+  authority: 'issue' // exact is the default relation
 });
 ```
 
-The low-level Mission and Task Lease APIs remain the source of truth. The facade must never add authority that those lower layers would reject.
+The task-first facade composes Mission + Task Lease + Guard. It must not add authority the lower layers would reject.
 
-## Adoption gate
+The Community Preview adds a first-class TypeScript declaration for this task-first package path and keeps the relation vocabulary intentionally small.
 
-Do not prioritize another deep authorization subsystem until the following are demonstrated:
+## Typed task authority
 
-- [ ] a new developer can run a meaningful task-first example in under 10 minutes;
-- [ ] at least three real workflow examples exist: coding, support/communications, and operations/finance;
-- [x] the same task-first API works in-memory and with durable local state;
-- [x] useful-task completion stays high under the deterministic product benchmark;
-- [x] normal fixture task actions do not trigger unnecessary approvals;
-- [x] unrelated-resource effects execute zero provider callbacks in the deterministic fixture, live GitHub proof, support/communications proof, and operations/finance proof;
-- [x] approval/step-up output explains the established authority and requested delta clearly;
-- [ ] at least one external developer uses the package without project-author assistance.
-
-The checked utility items are evidence about the current deterministic fixtures and live GitHub proof, not a claim that arbitrary real-world agent workloads have already met the same rates.
-
-## First live provider product proof
-
-The existing GitHub Actions mutation validation now runs through the public task-first API rather than hand-assembling Mission + Task Lease + Guard.
-
-The live workflow uses:
+Bindings support only:
 
 ```text
-createTask()
-   |
-   v
-task.run(issue.list)
-   |
-   v
-task.authorityFrom(reviewed GitHub output)
-   |
-   v
-issue #9 becomes downstream task authority
-   |
-   +--> task.run(issue.comment #9) -> real GitHub mutation
-   +--> task.run(issue.comment #1) -> STEP-UP, zero provider mutation
-   |
-   v
-task.complete()
-   |
-   v
-issue.comment #9 -> DENY, zero provider mutation
+exact   request value == established authority value
+oneOf   request value is one member of an established finite set
+max     request numeric value <= established numeric ceiling
 ```
 
-Passing CI evidence from the live run:
+`exact` remains the backward-compatible default.
 
-- repository root: `Null-Square/agent-authority`;
-- reviewed fixture selection: issue `#9`;
-- `task.authorityFrom()` established issue `#9` as downstream authority;
-- exactly one real GitHub comment mutation executed;
-- unrelated issue `#1` produced `authority_delta_required` before provider mutation;
-- `task.explain()` reported established authority `9` vs requested value `1`;
-- the same issue was denied after `task.complete()`;
-- provider calls before cleanup: `reads=1`, `task_mutations=1`;
-- the temporary validation comment was deleted outside the authority proof.
+The design rule is **benchmark/workflow first, relation second**. `oneOf` exists because an external AgentDojo task requires exactly two legitimate Slack channels. `max` exists because the finance workflow needs a legitimate partial refund without authorizing an over-refund. We are not introducing a general expression language.
 
-This establishes a real-provider product proof for the facade, but it is **not yet** the full coding-agent product workflow. Branch creation, file edits and PR creation still need to be chained under task-derived authority while merge/deploy remain outside the task.
+Invalid relation names are rejected. Invalid fact/value shapes fail closed. A request outside the relation becomes `authority_delta_required` before the guarded effect runs.
 
-## Cross-provider support/communications proof
+`max` is per effect, not cumulative accounting. Providers remain authoritative for aggregate state such as how much of a payment has already been refunded.
 
-`examples/task-first-support.js` exercises the same public facade across two service boundaries using the exact field names and normalized sender shape used by the Google adapter:
+## Community Preview evidence bar
+
+The code is announceable as a **Community / Developer Preview** when all repository-controlled items below are green:
+
+- task-first GitHub coding workflow: issue -> branch -> file -> draft PR, with merge outside authority;
+- support/communications proof across Gmail-shaped thread data -> Calendar-shaped attendee authority;
+- operations/finance proof: ticket -> order -> payment -> bounded partial refund;
+- external AgentDojo oracle benchmark over the selected Slack set;
+- zero execution-effective unauthorized callbacks in the deterministic adversarial fixtures;
+- Node 20/22 CI, package consumer checks and CodeQL;
+- current security/trust-boundary documentation;
+- packageable task-first TypeScript declarations;
+- reproducible contribution and benchmark instructions.
+
+These gates are deliberately different from a production-readiness claim.
+
+## What remains external validation
+
+The repository cannot self-certify adoption or model robustness. The following remain open after the Community Preview is announced:
+
+- a first-time independent developer completing a meaningful integration in under 10 minutes;
+- at least one external developer adopting the package without project-author assistance;
+- model-in-the-loop AgentDojo runs with official utility/security scores;
+- independent attempts to bypass the enforcement boundary;
+- production credential lifecycle and remote multi-tenant deployment evidence.
+
+Community announcement is intended to recruit exactly this evidence, not to pretend it already exists.
+
+## Coding workflow proof
+
+The task-first coding example now establishes this lineage:
 
 ```text
-Task: handle one customer email and schedule the requested meeting
-
-origin thread authority
-      |
-      v
-task.run(gmail:thread.read)
-      |
-      v
-reviewed Gmail sender extractor
-      |
-      v
-customer@example.com
-      |
-      v
-task.bind(calendar:event.create.attendee_email)
-      |
-      +--> exact customer meeting -> ALLOW
-      +--> unrelated attendee -> STEP-UP, zero Calendar callbacks
-      |
-      v
-task.complete() -> same meeting authority no longer usable
+repository
+   |
+   v
+issue
+   |
+   v
+base SHA
+   |
+   v
+task branch
+   |
+   v
+changed path
+   |
+   v
+draft pull request
 ```
 
-The task also binds the Gmail `thread_id` and Calendar `calendar_id` to explicit task-entry roots. A different Gmail thread is stopped before its callback runs.
+The fixture proves that writes to `main`, unrelated file paths and PRs from the wrong branch step up before mutation, while merge remains explicitly denied. Completion removes the remaining task authority.
 
-The example and `test/task-product-support.test.js` run on Node 20 and Node 22 CI. The support proof demonstrates that the task-first model crosses Gmail -> Calendar without a second authorization abstraction.
+This is stronger than the earlier issue-comment slice: it demonstrates a recognizable coding-agent workflow under one task lineage.
 
-This is intentionally a **self-contained product proof**. It mirrors the real Google provider contract but does not close the separate public Google Actions evidence gate; that gate still requires repository OAuth secrets.
+## Support / communications proof
 
-## Operations / finance lineage proof
-
-`examples/task-first-finance.js` exercises a longer evidence-derived authority chain without adding another provider, policy DSL, or numeric relation language:
+The support example demonstrates:
 
 ```text
-Task: resolve one support ticket by refunding only its payment
+authorized Gmail-shaped thread
+   |
+   v
+reviewed sender extractor
+   |
+   v
+exact customer email authority
+   |
+   v
+Calendar-shaped attendee
+```
 
-ticket:481
+Another thread or attendee reaches zero provider-shaped callbacks. The same task-first model crosses the service boundary without a second authorization abstraction.
+
+A connected-account Google smoke has been demonstrated separately. Public GitHub Actions reproduction still depends on repository OAuth secrets and should remain a distinct evidence gate.
+
+## Operations / finance proof
+
+The Community Preview demonstrates:
+
+```text
+ticket
    |
    v
-task.run(helpdesk:ticket.read)
+order
    |
    v
-order:991
-   |
-   v
-task.run(orders:order.read)
-   |
-   v
-payment:abc123
-   |
-   v
-task.run(payments:payment.read)
+payment
    |
    +--> amount = 12500 minor units
    +--> currency = USD
    |
    v
-task.bind(refund payment_id + amount + currency)
+refund binding
    |
-   +--> exact full refund -> ALLOW
-   +--> another payment -> STEP-UP, zero refund callbacks
-   +--> over-refund -> STEP-UP, zero refund callbacks
-   +--> wrong currency -> STEP-UP, zero refund callbacks
-   +--> partial refund -> STEP-UP under current exact binding model
+   +--> same payment + 5000 USD -> ALLOW
+   +--> another payment          -> STEP-UP
+   +--> 15000 USD                -> STEP-UP
+   +--> wrong currency           -> STEP-UP
    |
    v
-task.complete() -> same refund authority no longer usable
+task.complete() -> DENY later effects
 ```
 
-The task cannot read an arbitrary order before the ticket establishes the order fact: the unresolved binding fails closed before the order callback runs. The same pattern continues through payment and refund.
+The amount uses `relation: 'max'`; payment ID and currency remain exact. The example executes one legitimate partial refund only, avoiding any suggestion that Agent Authority itself is an aggregate refund ledger.
 
-The example and `test/task-product-finance.test.js` run on Node 20 and Node 22 CI. On the passing fixture, provider-shaped callbacks are exactly one ticket read, one order read, one payment read and one refund.
+## External AgentDojo oracle proof
 
-This proof intentionally exposes a **product limitation rather than hiding it behind new policy machinery**: Task Lease bindings currently require exact equality. Therefore the payment amount `12500` can authorize an exact `12500` refund, but a legitimate partial refund such as `5000` also produces `authority_delta_required`. A future narrow `requested amount <= evidence-derived payment amount` relation may be justified if real provider/adoption evidence shows partial refunds are needed. Until then, the repository should keep this limitation visible instead of adding a general expression language speculatively.
+The AgentDojo harness pins `agentdojo==0.1.35`, benchmark version `v1.2.2`, Slack suite, and representative user tasks 5, 6, 7, 8 and 11.
+
+The first oracle run intentionally exposed a finite-set gap in user task 11: Dora must be added to exactly `general` and `random`. Exact equality could not express both without a false approval or wildcard.
+
+That finding drove the narrow `oneOf` relation. The Community Preview regression gate is now:
+
+```text
+selected tasks              5
+mapped tasks                5
+mapping coverage            100%
+mapped-task completion      100%
+unrelated-target block rate 100%
+unauthorized effects        0
+```
+
+This is useful external-task **oracle** evidence. It is not a model-in-the-loop prompt-injection result and must not be marketed as one. See `benchmarks/agentdojo/README.md`.
 
 ## Utility metrics
 
-Security tests remain required, but product work should additionally track:
+Security tests are necessary but product validation also tracks:
 
 ```text
 normal task completion rate
@@ -212,89 +214,37 @@ false approval rate
 true authority-delta step-up rate
 unauthorized effect rate
 provider effects per completed task
-integration lines required for a representative workflow
+mapping coverage
+integration friction / time-to-first-protected-effect
 ```
 
-`npm run benchmark:task` is the first deterministic fixture for these metrics. It is not a real-world benchmark and must not be marketed as one. Its purpose is to make utility regressions visible alongside security regressions.
+`npm run benchmark:task` remains a deterministic regression fixture. AgentDojo adds an externally defined task set. Neither replaces independent developer adoption evidence.
 
-The current fixture target is:
+## Security boundary that must stay visible
 
-```text
-normal task completion rate = 100%
-false approval rate = 0%
-true authority-delta step-up rate = 100%
-unauthorized effect rate = 0%
-```
+Agent Authority only protects effects that actually pass through its enforcement boundary. If an agent can reach the same provider through another credential/path, it can bypass the gate.
 
-The current fixture run contains 40 normal tasks and 10 unrelated-resource attempts. Real provider/harness benchmarks should replace or supplement it as the product matures.
+Strict `task.authorityFrom()` / `deriveFromEvidence()` prevents the ordinary caller from choosing a different derived value after the guarded output is produced: receipt, execution evidence, output hash and reviewed extractor must agree. This is still not cryptographic attestation from the remote provider itself.
 
-## Three product proofs
+Authenticated local durable recovery exists. Crash-atomic remote effect + local state coupling, automatic authority-delta application, source invalidation, production OAuth/KMS and hardened remote multi-tenancy remain incomplete.
 
-### Coding agent
-
-Task:
-
-> Fix issue #42 and open a PR. Do not merge or deploy.
-
-Desired authority lineage:
-
-```text
-repository -> issue -> task branch -> changed files -> pull request
-```
-
-Unrelated repositories, issues, merge and deploy remain outside the task.
-
-The live issue-discovery -> exact-issue-comment proof is the first slice of this direction; it does not complete the branch/files/PR lineage yet.
-
-### Support / communications agent
-
-Task:
-
-> Handle this customer email.
-
-Desired authority lineage:
-
-```text
-email thread -> customer -> meeting / CRM record / reply target
-```
-
-The self-contained Gmail-thread -> exact Calendar-attendee slice is now established. The next value proof should connect the same customer authority to another useful downstream action (for example reply/CRM) or rerun the task-first flow with the real Google Actions fixture once repository OAuth secrets are available.
-
-### Operations / finance agent
-
-Task:
-
-> Resolve this ticket and refund the affected order.
-
-Desired authority lineage:
-
-```text
-ticket -> customer -> order -> payment -> refund <= original payment
-```
-
-The self-contained ticket -> order -> payment -> **exact full refund** lineage is now established. The remaining product question is narrower than the original workflow: whether partial refunds are important enough to justify one evidence-derived numeric ceiling relation. Current exact bindings intentionally step up for a smaller amount rather than guessing that relation into the core.
+Read `SECURITY.md` for the complete current claim.
 
 ## Freeze list
 
-Until the adoption gate moves, the following remain research backlog unless a real workflow proves they are blocking adoption or safety:
+Until community evidence proves otherwise, do not prioritize:
 
-- distributed Task Lease databases;
-- generic storage abstraction layers;
-- provider-signed attestation protocols;
-- another token or identity format;
-- a general delegation standard;
-- a proprietary policy DSL;
-- broad OAuth/OIDC platform work;
-- another MCP control plane;
-- A2A protocol implementation;
-- large connector-count expansion;
-- full distributed transaction semantics across arbitrary remote providers.
+- a proprietary general policy DSL;
+- new identity/token formats;
+- connector-count expansion for its own sake;
+- another MCP control plane or agent harness;
+- dashboard-first enterprise features;
+- distributed persistence machinery without a demonstrated product need;
+- broad OAuth platform work before real adopters need it.
 
-The existing durability, evidence, transport and credential primitives should be reused rather than deepened by default.
+Prefer the smallest change that closes a measured workflow, attack or adoption gap.
 
 ## Boundary discipline
-
-Agent Authority should integrate with identity providers, OAuth systems, MCP gateways, policy engines and agent frameworks rather than compete with all of them.
 
 The intended position is:
 
@@ -308,4 +258,4 @@ Agent Authority
 existing SDK / MCP / gateway / OAuth / provider
 ```
 
-The product wins if that middle layer is small to adopt, preserves useful autonomy, and technically prevents the same standing account permission from becoming unrelated task authority.
+The product wins if that middle layer is small to adopt, preserves useful agent work, exposes precise authority deltas, and prevents standing provider permission from silently becoming unrelated task authority.

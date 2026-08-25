@@ -43,7 +43,7 @@ function financeTask() {
   return createTask({
     principal: 'user:finance-test',
     agent: 'agent:finance-test',
-    request: 'Refund only the payment established by this support ticket',
+    request: 'Refund no more than the payment established by this support ticket',
     permissions: {
       helpdesk: { allow: ['ticket.read'], constraints: { ticket_id: ['ticket:1'] } },
       commerce: { allow: ['order.read'], constraints: {} },
@@ -61,7 +61,7 @@ function financeTask() {
       { service: 'commerce', action: 'order.read', field: 'order_id', authority: 'order' },
       { service: 'payments', action: 'payment.read', field: 'payment_id', authority: 'payment' },
       { service: 'payments', action: 'refund.create', field: 'payment_id', authority: 'payment' },
-      { service: 'payments', action: 'refund.create', field: 'amount_minor', authority: 'paymentAmount' },
+      { service: 'payments', action: 'refund.create', field: 'amount_minor', authority: 'paymentAmount', relation: 'max' },
       { service: 'payments', action: 'refund.create', field: 'currency', authority: 'paymentCurrency' }
     ]
   });
@@ -106,7 +106,7 @@ async function establishPayment(task, counters) {
   return { order, payment, amount, currency };
 }
 
-test('finance task keeps ticket -> order -> payment -> exact refund on one evidence-derived lineage', async () => {
+test('finance task keeps ticket -> order -> payment -> bounded refund on one evidence-derived lineage', async () => {
   const task = financeTask();
   const counters = { ticket: 0, order: 0, payment: 0, refund: 0 };
 
@@ -132,19 +132,18 @@ test('finance task keeps ticket -> order -> payment -> exact refund on one evide
   const refund = await task.run({
     service: 'payments',
     action: 'refund.create',
-    context: { payment_id: payment.value, amount_minor: amount.value, currency: currency.value }
+    context: { payment_id: payment.value, amount_minor: 5000, currency: currency.value }
   }, async () => {
     counters.refund += 1;
-    return { refund_id: 'refund:1' };
+    return { refund_id: 'refund:partial-1' };
   });
-  assert.equal(refund.output.refund_id, 'refund:1');
+  assert.equal(refund.output.refund_id, 'refund:partial-1');
   assert.deepEqual(counters, { ticket: 1, order: 1, payment: 1, refund: 1 });
 
   for (const [label, context, expectedField] of [
-    ['unrelated payment', { payment_id: 'payment:other', amount_minor: 12500, currency: 'USD' }, 'payment_id'],
+    ['unrelated payment', { payment_id: 'payment:other', amount_minor: 5000, currency: 'USD' }, 'payment_id'],
     ['over refund', { payment_id: 'payment:20', amount_minor: 15000, currency: 'USD' }, 'amount_minor'],
-    ['partial refund', { payment_id: 'payment:20', amount_minor: 5000, currency: 'USD' }, 'amount_minor'],
-    ['wrong currency', { payment_id: 'payment:20', amount_minor: 12500, currency: 'EUR' }, 'currency']
+    ['wrong currency', { payment_id: 'payment:20', amount_minor: 5000, currency: 'EUR' }, 'currency']
   ]) {
     let delta;
     await assert.rejects(
@@ -169,7 +168,7 @@ test('finance task keeps ticket -> order -> payment -> exact refund on one evide
     () => task.run(
       {
         service: 'payments', action: 'refund.create',
-        context: { payment_id: 'payment:20', amount_minor: 12500, currency: 'USD' }
+        context: { payment_id: 'payment:20', amount_minor: 5000, currency: 'USD' }
       },
       async () => {
         counters.refund += 1;
@@ -181,25 +180,39 @@ test('finance task keeps ticket -> order -> payment -> exact refund on one evide
   assert.equal(counters.refund, 1);
 });
 
-test('partial refund is an explicit product gap under current exact authority bindings', async () => {
+test('evidence-derived max authority allows a legitimate partial refund and steps up an over-refund', async () => {
   const task = financeTask();
   const counters = { ticket: 0, order: 0, payment: 0, refund: 0 };
   await establishPayment(task, counters);
+
+  const partial = await task.run(
+    {
+      service: 'payments', action: 'refund.create',
+      context: { payment_id: 'payment:20', amount_minor: 5000, currency: 'USD' }
+    },
+    async () => {
+      counters.refund += 1;
+      return { refund_id: 'partial' };
+    }
+  );
+  assert.equal(partial.output.refund_id, 'partial');
+  assert.equal(counters.refund, 1);
 
   await assert.rejects(
     () => task.run(
       {
         service: 'payments', action: 'refund.create',
-        context: { payment_id: 'payment:20', amount_minor: 5000, currency: 'USD' }
+        context: { payment_id: 'payment:20', amount_minor: 15000, currency: 'USD' }
       },
       async () => {
         counters.refund += 1;
-        return { refund_id: 'partial' };
+        return { refund_id: 'must-not-run' };
       }
     ),
     (error) => error instanceof AuthorityApprovalRequiredError
       && error.code === 'authority_delta_required'
       && error.result?.authority_delta?.context_field === 'amount_minor'
+      && error.result?.authority_delta?.relation === 'max'
   );
-  assert.equal(counters.refund, 0);
+  assert.equal(counters.refund, 1);
 });

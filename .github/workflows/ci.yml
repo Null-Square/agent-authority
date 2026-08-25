@@ -28,7 +28,7 @@ jobs:
       - run: npm run demo:task
       - run: npm run demo:task-coding
       - run: node examples/task-first-support.js
-      - run: node examples/task-first-finance.js
+      - run: npm run demo:task-finance
       - run: npm run benchmark:task
       - run: npm run demo:task-lease
       - run: npm run check:syntax
@@ -62,6 +62,7 @@ jobs:
           cp test/consumer/package-smoke.mjs "$CONSUMER/package-smoke.mjs"
           cp test/consumer/connected-smoke.mjs "$CONSUMER/connected-smoke.mjs"
           cp test/consumer/coding-smoke.mjs "$CONSUMER/coding-smoke.mjs"
+          cp test/consumer/task-types-smoke.ts "$CONSUMER/task-types-smoke.ts"
           cd "$CONSUMER"
           npm init -y >/dev/null
           npm install "$ROOT/$TARBALL" --ignore-scripts
@@ -72,6 +73,8 @@ jobs:
           node package-smoke.mjs
           node connected-smoke.mjs
           node coding-smoke.mjs
+          npm install --no-save --package-lock=false --ignore-scripts typescript@5.9.2
+          npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext task-types-smoke.ts
 
   ai-sdk-integration:
     runs-on: ubuntu-latest

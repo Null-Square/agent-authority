@@ -34,6 +34,7 @@
     "demo": "node examples/demo.js",
     "demo:task": "node examples/task-first-github.js",
     "demo:task-coding": "node examples/task-first-coding.js",
+    "demo:task-finance": "node examples/task-first-finance.js",
     "demo:task-lease": "node examples/task-lease-demo.js",
     "demo:live-github": "node examples/live-github-task-lease.js",
     "demo:live-derived-github": "node examples/live-github-derived-mutation.js",
@@ -45,9 +46,9 @@
     "test": "node --test test/*.test.js",
     "test:ai-sdk": "node --test test/integrations/ai-sdk.integration.mjs",
     "test:coverage": "node --experimental-test-coverage --test test/*.test.js",
-    "check:syntax": "node --check src/index.js && node --check src/authority-evidence.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/providers/github-coding.js && node --check src/providers/google.js && node --check src/storage.js && node --check src/durable-task-lease.js && node --check src/task.js && node --check src/runtime-env.js && node --check src/sdk.js && node --check src/server.js && node --check src/cli.js && node --check src/agent-auth.js && node --check src/approvals.js && node --check src/idempotency.js && node --check src/keys.js && node --check src/harness-bridge.js && node --check src/guard.js && node --check src/task-lease.js && node --check src/mcp-gateway.js && node --check src/mcp-remote.js && node --check src/mcp-server.js && node --check src/integrations/ai-sdk.js && node --check examples/validation-mcp-upstream.js && node --check examples/direct-guard.js && node --check examples/task-first-github.js && node --check examples/task-first-coding.js && node --check examples/task-lease-demo.js && node --check examples/live-github-task-lease.js && node --check examples/live-github-derived-mutation.js && node --check examples/live-google-cross-provider.js && node --check examples/quickstart-github-connected.mjs && node --check benchmarks/task-utility.mjs",
+    "check:syntax": "node --check src/index.js && node --check src/authority-evidence.js && node --check src/connections.js && node --check src/execution.js && node --check src/providers/github.js && node --check src/providers/github-coding.js && node --check src/providers/google.js && node --check src/storage.js && node --check src/durable-task-lease.js && node --check src/task.js && node --check src/runtime-env.js && node --check src/sdk.js && node --check src/server.js && node --check src/cli.js && node --check src/agent-auth.js && node --check src/approvals.js && node --check src/idempotency.js && node --check src/keys.js && node --check src/harness-bridge.js && node --check src/guard.js && node --check src/task-lease.js && node --check src/mcp-gateway.js && node --check src/mcp-remote.js && node --check src/mcp-server.js && node --check src/integrations/ai-sdk.js && node --check examples/validation-mcp-upstream.js && node --check examples/direct-guard.js && node --check examples/task-first-github.js && node --check examples/task-first-coding.js && node --check examples/task-first-finance.js && node --check examples/task-lease-demo.js && node --check examples/live-github-task-lease.js && node --check examples/live-github-derived-mutation.js && node --check examples/live-google-cross-provider.js && node --check examples/quickstart-github-connected.mjs && node --check benchmarks/task-utility.mjs",
     "check:package": "npm pack --dry-run",
-    "check": "npm run check:syntax && npm test && npm run demo:task && npm run demo:task-coding && npm run benchmark:task && npm run demo:task-lease && npm run check:package"
+    "check": "npm run check:syntax && npm test && npm run demo:task && npm run demo:task-coding && npm run demo:task-finance && npm run benchmark:task && npm run demo:task-lease && npm run check:package"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "^2.0.0",
@@ -78,7 +79,11 @@
     "./runtime-env": "./src/runtime-env.js",
     "./sdk": "./src/sdk.js",
     "./storage": "./src/storage.js",
-    "./task": "./src/task.js",
+    "./task": {
+      "types": "./src/task.d.ts",
+      "import": "./src/task.js",
+      "default": "./src/task.js"
+    },
     "./task-lease": "./src/task-lease.js",
     "./providers/github": "./src/providers/github.js",
     "./providers/github-coding": "./src/providers/github-coding.js",

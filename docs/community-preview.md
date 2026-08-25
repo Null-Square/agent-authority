@@ -2,13 +2,13 @@
 
 ## Launch position
 
-Agent Authority is ready to be announced as a **Community / Developer Preview** when the v0.5.0 release candidate is green and the fresh npm install is verified.
+Agent Authority **v0.5.0 is released as a Community / Developer Preview**. The package is published on npm with GitHub Actions provenance, and the post-publication workflow has completed a fresh install and consumer verification from the public npm registry.
 
-The announcement should make one clear claim:
+The launch makes one clear claim:
 
 > **Give your agent a task, not your account.** Agent Authority adds a task-bounded effect boundary so broad standing provider permission does not silently become authority for unrelated work.
 
-Do not announce it as production IAM, a sandbox, a prompt-injection cure, or a complete credential platform.
+Do not present it as production IAM, a sandbox, a prompt-injection cure, or a complete credential platform.
 
 ## What makes this preview useful now
 
@@ -26,9 +26,15 @@ The project is no longer only a policy prototype. It has:
 
 That is enough substance for outside developers to evaluate the idea on its merits.
 
+## Release verification
+
+The exact v0.5.0 release candidate passed the repository release gates before merge. After merge, npm accepted `@nullsquare/agent-authority@0.5.0` and emitted a signed provenance statement. The first workflow attempt then hit a registry-propagation timeout after publication had already succeeded. A retry detected the existing published version, skipped republishing, confirmed registry visibility, and completed the fresh-registry consumer verification successfully.
+
+The release workflow now treats publication and registry visibility as separate gates so a package is not called released until both are verified.
+
 ## Evidence we can state publicly
 
-For the selected pinned AgentDojo Slack oracle set, the Community Preview gate requires:
+For the selected pinned AgentDojo Slack oracle set, the Community Preview gate is:
 
 ```text
 selected tasks              5
@@ -68,7 +74,7 @@ The strongest launch posture is transparent: show what is technically prevented 
 
 ### 1. First-time developer challenge
 
-Use issue #43. Start from a blank directory, follow the public quickstart, and report time-to-first-PASS, confusion, errors and whether author help was needed.
+Use [issue #43](https://github.com/Null-Square/agent-authority/issues/43). Start from a blank directory, follow the public quickstart, and report time-to-first-PASS, confusion, errors and whether author help was needed.
 
 Target:
 
@@ -79,7 +85,7 @@ project-author assistance       0
 
 ### 2. Model-in-the-loop AgentDojo challenge
 
-Use issue #50. Preserve official AgentDojo utility/security scoring and separately count execution-effective unauthorized effects after the Agent Authority gate.
+Use [issue #50](https://github.com/Null-Square/agent-authority/issues/50). Preserve official AgentDojo utility/security scoring and separately count execution-effective unauthorized effects after the Agent Authority gate.
 
 A negative result is welcome. The goal is evidence, not a favorable benchmark slide.
 
@@ -106,7 +112,7 @@ If the task cannot be represented, first contribute a failing fixture/benchmark 
 
 ## Suggested announcement — long form
 
-**Agent Authority is now in Community Preview: give your agent a task, not your account.**
+**Agent Authority v0.5.0 is now in Community Preview: give your agent a task, not your account.**
 
 AI agents increasingly operate through credentials that are broader than the task a user actually requested. OAuth can say an app may use GitHub, Gmail, Calendar or another provider, but that standing permission does not answer whether one specific effect belongs to the current task.
 
@@ -122,7 +128,7 @@ If you can break the enforcement claim, make the API simpler, reproduce the benc
 
 ## Suggested announcement — short form
 
-**Agent Authority Community Preview:** give your agent a task, not your account.
+**Agent Authority v0.5.0 Community Preview:** give your agent a task, not your account.
 
 Task-bounded effect authority for AI agents, with evidence-derived resource lineage, `exact` / `oneOf` / `max` bindings, coding + finance proofs, connected GitHub, durable local tasks, TypeScript DX, and a pinned AgentDojo oracle benchmark.
 

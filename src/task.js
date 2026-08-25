@@ -81,7 +81,8 @@ function normalizeBinding(binding) {
     service: requiredString(binding.service, 'binding.service'),
     action: requiredString(binding.action, 'binding.action'),
     context_field: requiredString(binding.field || binding.context_field, 'binding.field'),
-    fact_id: factId(binding.authority || binding.fact_id)
+    fact_id: factId(binding.authority || binding.fact_id),
+    relation: binding.relation || 'exact'
   };
 }
 
@@ -218,13 +219,23 @@ export class AgentTask {
     if (result.code === 'authority_delta_required') {
       const delta = result.authority_delta || {};
       const established = delta.current_fact_id ? this._lease.fact(delta.current_fact_id) : null;
+      const relation = delta.relation || 'exact';
+      let summary;
+      if (relation === 'oneOf') {
+        summary = `The task allows one of ${JSON.stringify(established?.value)} but this action requested ${JSON.stringify(delta.requested_value)}.`;
+      } else if (relation === 'max') {
+        summary = `The task established a maximum of ${JSON.stringify(established?.value)} but this action requested ${JSON.stringify(delta.requested_value)}.`;
+      } else {
+        summary = `The task established authority for ${JSON.stringify(established?.value)} but this action requested ${JSON.stringify(delta.requested_value)}.`;
+      }
       return {
         decision: result.decision,
         code: result.code,
-        summary: `The task established authority for ${JSON.stringify(established?.value)} but this action requested ${JSON.stringify(delta.requested_value)}.`,
+        summary,
         service: delta.service,
         action: delta.action,
         field: delta.context_field,
+        relation,
         established_authority: established,
         requested_value: structuredClone(delta.requested_value)
       };

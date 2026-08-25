@@ -55,7 +55,7 @@ const paymentCurrencyExtractor = operationExtractor({
 const task = createTask({
   principal: 'user:finance-demo',
   agent: 'agent:finance-demo',
-  request: 'Resolve this support ticket by refunding only its affected payment',
+  request: 'Resolve this support ticket by refunding no more than its affected payment',
   permissions: {
     helpdesk: {
       allow: ['ticket.read'],
@@ -79,7 +79,7 @@ const task = createTask({
     { service: 'commerce', action: 'order.read', field: 'order_id', authority: 'order' },
     { service: 'payments', action: 'payment.read', field: 'payment_id', authority: 'payment' },
     { service: 'payments', action: 'refund.create', field: 'payment_id', authority: 'payment' },
-    { service: 'payments', action: 'refund.create', field: 'amount_minor', authority: 'paymentAmount' },
+    { service: 'payments', action: 'refund.create', field: 'amount_minor', authority: 'paymentAmount', relation: 'max' },
     { service: 'payments', action: 'refund.create', field: 'currency', authority: 'paymentCurrency' }
   ]
 });
@@ -89,7 +89,7 @@ let orderReads = 0;
 let paymentReads = 0;
 let refunds = 0;
 
-console.log('Task: Resolve one support ticket by refunding only the payment discovered through that ticket');
+console.log('Task: Resolve one support ticket by refunding no more than the payment discovered through that ticket');
 
 console.log('1. Read the exact authorized ticket');
 const ticket = await task.run({
@@ -149,22 +149,22 @@ const currency = task.authorityFrom(paymentRead, {
   from: 'payment',
   extractor: paymentCurrencyExtractor
 });
-console.log(`   authority -> ${amount.value} minor units ${currency.value}`);
+console.log(`   authority -> at most ${amount.value} minor units ${currency.value}`);
 
-console.log('4. Refund exactly the payment established by the authorized chain');
+console.log('4. Execute a legitimate partial refund below the evidence-derived maximum');
 await task.run({
   service: 'payments',
   action: 'refund.create',
   context: {
     payment_id: payment.value,
-    amount_minor: amount.value,
+    amount_minor: 5000,
     currency: currency.value
   }
 }, async () => {
   refunds += 1;
-  return { refund_id: 'refund:full-1', status: 'succeeded' };
+  return { refund_id: 'refund:partial-1', status: 'succeeded' };
 });
-console.log('   ALLOW -> exact full refund executed');
+console.log('   ALLOW -> partial refund executed under max authority');
 
 async function proveRefundBlocked(label, context) {
   try {
@@ -182,10 +182,10 @@ async function proveRefundBlocked(label, context) {
   }
 }
 
-console.log('5. Prove unrelated payment and amount changes do not inherit the task authority');
+console.log('5. Prove unrelated payment, over-refund and wrong currency do not inherit authority');
 await proveRefundBlocked('unrelated payment', {
   payment_id: 'payment:other',
-  amount_minor: amount.value,
+  amount_minor: 5000,
   currency: currency.value
 });
 await proveRefundBlocked('over-refund', {
@@ -193,10 +193,10 @@ await proveRefundBlocked('over-refund', {
   amount_minor: 15000,
   currency: currency.value
 });
-await proveRefundBlocked('partial refund under the current exact-binding model', {
+await proveRefundBlocked('wrong currency', {
   payment_id: payment.value,
   amount_minor: 5000,
-  currency: currency.value
+  currency: 'EUR'
 });
 
 if (refunds !== 1) throw new Error(`expected exactly one refund callback, got ${refunds}`);
@@ -207,7 +207,7 @@ try {
   await task.run({
     service: 'payments',
     action: 'refund.create',
-    context: { payment_id: payment.value, amount_minor: amount.value, currency: currency.value }
+    context: { payment_id: payment.value, amount_minor: 1000, currency: currency.value }
   }, async () => {
     refunds += 1;
     return { refund_id: 'must-not-run-after-completion' };
@@ -219,5 +219,5 @@ try {
 }
 
 console.log(`Provider-shaped callbacks: tickets=${ticketReads}, orders=${orderReads}, payments=${paymentReads}, refunds=${refunds}`);
-console.log('PASS -> ticket -> order -> payment -> exact refund authority stayed on one evidence-derived lineage');
-console.log('PRODUCT GAP -> partial refunds currently step up because Task Lease bindings are exact equality; derived numeric <= is intentionally not implemented yet');
+console.log('PASS -> ticket -> order -> payment -> bounded partial refund authority stayed on one evidence-derived lineage');
+console.log('NOTE -> max is a per-effect ceiling, not a cumulative refund ledger; provider-side idempotency and payment state remain authoritative for aggregate refund totals');

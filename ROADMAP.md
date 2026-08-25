@@ -1,6 +1,6 @@
 # Agent Authority Roadmap
 
-Agent Authority is implementation-first, but the current bottleneck is now **product proof**, not another authorization subsystem.
+Agent Authority's current bottleneck is **product proof and external validation**, not another authorization subsystem.
 
 The product thesis is:
 
@@ -8,224 +8,194 @@ The product thesis is:
 
 The differentiated mechanism is:
 
-> **Authority may follow exact resources discovered through already-authorized execution, without becoming ambient account authority.**
+> **Authority may follow task resources discovered through already-authorized execution, without becoming ambient account authority.**
 
-## Core invariant
+Core invariant:
 
 ```text
 Task Lease authority <= Mission authority
 ```
 
-Across delegation, transports and durable state:
+Across delegation, transports and durable state, authority may stay equal or shrink; it must never silently grow.
+
+## Current stage — Community / Developer Preview
+
+The repository has a strong enforcement and evidence foundation. The immediate goal is now to make the product easy enough, measurable enough and transparent enough that outside developers and security researchers can use it, attack it and extend it.
+
+Community Preview does **not** mean production-ready. It means the implementation has enough real workflow proof to justify asking the community for independent evidence.
+
+## Community Preview release gate
+
+Repository-controlled gates:
+
+- [x] task-first facade over Mission + Task Lease + Guard;
+- [x] `task.run()` for application-owned effects;
+- [x] `task.execute()` for connected-provider effects;
+- [x] strict `task.authorityFrom()` evidence-derived authority;
+- [x] authenticated local durable Task Lease recovery;
+- [x] GitHub connected-provider path with broker-internal credential resolution;
+- [x] coding workflow: issue -> task branch -> exact changed path -> draft PR, with merge outside authority;
+- [x] support/communications proof across Gmail-shaped thread -> exact Calendar-shaped attendee;
+- [x] operations/finance proof across ticket -> order -> payment -> bounded partial refund;
+- [x] narrow typed binding relations: `exact`, `oneOf`, `max`;
+- [x] exact remains backward-compatible default, including recovered snapshots;
+- [x] invalid relation/fact shapes fail closed;
+- [x] external AgentDojo Slack oracle harness pinned to `agentdojo==0.1.35` / `v1.2.2`;
+- [x] selected AgentDojo oracle set maps 5/5 after `oneOf` closes the finite-set gap;
+- [x] selected AgentDojo oracle set preserves 100% legitimate completion, blocks 100% unrelated target attempts and executes 0 unauthorized effects;
+- [x] first-class TypeScript declarations for the task-first package path;
+- [x] Node 20/22 CI, coverage, package checks, CodeQL and connected GitHub validation;
+- [x] security, evidence and contribution docs state the current trust boundary rather than old prototype limits;
+- [ ] final `v0.5.0` package candidate passes all required checks after the version bump;
+- [ ] fresh install of `v0.5.0` is verified from npm after publish.
+
+Only the last two items are release mechanics. They should be completed after the feature/docs candidate is fully green.
+
+## External validation gate — what Community Preview is for
+
+These cannot be self-certified by the repository and should remain visibly open:
+
+- [ ] first-time independent developer completes a meaningful integration in under 10 minutes;
+- [ ] at least one external developer keeps Agent Authority in a real agent workflow without project-author assistance;
+- [ ] model-in-the-loop AgentDojo run publishes reproducible official utility/security scores;
+- [ ] execution-effective unauthorized effects are reported separately from attempted model tool calls;
+- [ ] independent security review attempts direct-path bypass, request substitution, provenance substitution and relation abuse;
+- [ ] at least one external contributor lands a useful mapping, integration, adversarial test or benchmark extension.
+
+Announcement should explicitly invite this work rather than imply it has already happened.
+
+## Narrow typed relations — evidence-driven only
+
+The current relation vocabulary is deliberately small:
 
 ```text
-authority may stay the same or shrink
-never silently grow
+exact   request == established fact
+oneOf   request ∈ established finite set
+max     numeric request <= established ceiling
 ```
 
-## P0 — Task-first product proof — current priority
+Why each exists:
 
-The engine has enough depth to test whether developers actually want this layer. Product work now outranks additional distributed/crypto infrastructure unless a real workflow proves the missing infrastructure is blocking adoption or safety.
+- `exact` is the original task-resource invariant;
+- `oneOf` was justified by AgentDojo Slack `user_task_11`, which legitimately targets exactly `{general, random}`;
+- `max` was justified by the finance workflow, where a partial refund should be useful while an over-refund remains outside authority.
 
-- [x] task-first facade over Mission + Task Lease + Guard
-- [x] explicit service permissions without requiring hand-authored Mission JSON
-- [x] named task authority roots
-- [x] `task.run()` guarded application-owned effect boundary
-- [x] `task.execute()` connected-provider effect boundary with broker-owned credential resolution
-- [x] `task.authorityFrom()` strict evidence-derived authority from `run()` or successful `execute()` output
-- [x] task-first binding of named authority to later effects
-- [x] human-readable authority-delta explanation
-- [x] same task-first calls can opt into durable local state by adding a store
-- [x] self-contained GitHub-shaped task-first demo
-- [x] deterministic utility regression benchmark
-- [x] first live provider proof through task-first API: GitHub issue discovery -> exact issue comment
-- [x] self-contained support/communications proof: Gmail thread -> exact Calendar attendee
-- [x] self-contained operations/finance proof: ticket -> order -> payment -> exact full refund
-- [x] automated blank-project quickstart against the current published npm package
-- [x] blank-project real-provider quickstart: broad standing `repo.read` -> one task-authorized public GitHub repository
-- [x] encrypted connected GitHub onboarding: stdin credential -> local vault/broker -> `task.execute()` -> live provider request
-- [ ] coding workflow: issue -> branch -> files -> PR, with merge/deploy outside authority
-- [ ] support/communications expansion: customer -> meeting + reply/CRM, or live task-first Google Actions proof
-- [ ] bounded finance refund: derived payment amount can authorize a smaller refund without authorizing an over-refund
-- [ ] first-time developer can complete a meaningful integration in under 10 minutes
-- [ ] at least one external developer adopts the package without project-author assistance
+Do **not** turn this into a general expression language. Add another typed relation only when a real external workflow or benchmark fails safely first and the smallest new relation closes that exact gap.
 
-The live GitHub task-first proof selected issue #9 through the reviewed provider mapping, established that issue through `task.authorityFrom()`, executed exactly one real comment mutation, blocked unrelated issue #1 with `authority_delta_required`, surfaced the established-vs-requested explanation, denied the same issue after task completion, and observed `reads=1` / `task_mutations=1` before cleanup.
+`max` is per effect, not cumulative accounting. Provider-side state, budgets and idempotency remain authoritative for aggregate totals.
 
-The support/communications proof uses the same task-first API across Gmail and Calendar: one authorized `thread_id` establishes one canonical `sender_email` through the reviewed Google extractor; only that attendee can be used for the task-bound Calendar event, while another thread or attendee executes zero provider-shaped callbacks. The example mirrors the real Google adapter contract but does not replace the still-open public Google Actions evidence gate.
+## Foundation status
 
-The operations/finance proof keeps one evidence-derived chain from support ticket -> order -> payment -> exact refund. The exact payment ID, amount in minor units, and currency are all bound before the refund callback can execute. Unrelated payment, over-refund, wrong currency, partial refund under the current equality model, and post-completion refund all execute zero additional refund callbacks. This proof exposed a deliberate product gap: current bindings are exact equality, so a legitimate partial refund also steps up. Do not add a general expression language; add a narrow derived numeric ceiling only when real workflow/adoption evidence shows partial refunds are required.
+### M0 — enforcement foundation: established
 
-The fixture fresh-install quickstart is independently exercised from blank Node 20 projects against the public npm package. The release-facing registry verifier for v0.4.7 installs that exact package, confirms the optional AI SDK is absent, and runs the ordinary public consumer contract plus the connected-execution consumer contract. This is automated compatibility evidence, not a substitute for the still-open first-time-human under-10-minute test.
+- Mission validation and explicit deny precedence;
+- allow / deny / require-approval outcomes;
+- resource constraints, expiry and budgets;
+- delegation attenuation and revocation;
+- semantic request receipts / hashes;
+- protocol-neutral guard boundary;
+- one-time approvals and mutation idempotency;
+- encrypted trusted-local-host credential vault;
+- GitHub brokered execution;
+- MCP gateway and harness-managed connector proofs;
+- Node 20/22 CI, coverage, package checks and CodeQL.
 
-The live credential-free quickstart keeps Mission-level `github:repo.read` broader than the task, binds Task authority to `Null-Square/agent-authority`, performs one real public GitHub API call, and produces `authority_delta_required` for `octocat/Hello-World` before a second `fetch()` can run.
+### M1 — Task Lease / task-resource authority: established
 
-v0.4.7 adds the authenticated connected path without creating an OAuth platform: a GitHub credential is accepted on stdin, stored in the encrypted trusted-local-host vault, resolved only inside the broker/provider runtime, and used by `task.execute()`. The live CI proof uses the repository's GitHub Actions installation token, confirms the raw token is not present in public task/connection state or plaintext under the Agent Authority home, executes the task-authorized repository read, and blocks the unrelated repository before connected provider execution. A fine-grained PAT or GitHub App token can use the same path for repositories it is allowed to access; public CI does not independently claim access to an unrelated private repository.
+- explicit task authority roots;
+- same-Mission / same-lease lineage;
+- evidence-derived facts;
+- `exact`, `oneOf` and `max` bindings;
+- unresolved facts fail closed;
+- relation mismatch becomes an authority-delta step-up;
+- Mission remains the ceiling;
+- completion/expiry immediately remove task authority;
+- Task Lease ID/hash retained in receipts.
 
-Current utility regression metrics:
+### M2 — durable local task execution: established for product proof
 
-```text
-normal task completion rate
-false approval rate
-true authority-delta step-up rate
-unauthorized effect rate
-provider effects per completed task
-```
+- authenticated local persistence/recovery;
+- exact Mission-hash binding on recovery;
+- atomic authenticated whole-state transaction primitive;
+- stale-writer compare-and-swap protection;
+- local per-lease locking;
+- durable completion/expiry;
+- refresh before security-critical evaluation.
 
-The deterministic fixture target is 100% normal completion, 0% false approvals, 100% true-delta step-up and 0% unauthorized effects. It is a regression fixture, not a real-world benchmark.
+Still open because it is not required for Community Preview:
 
-See `docs/product-proof.md`.
+- [ ] safe application of an approved authority delta into a live durable task;
+- [ ] crash-safe remote-effect / durable-state coupling;
+- [ ] stronger multi-process recovery tooling;
+- [ ] remote/distributed persistence only if real adoption requires it.
 
-**Product gate:** do not prioritize deeper distributed persistence, provider-attestation protocols, new token formats, broad OAuth platform work, A2A, a policy DSL, another MCP control plane, or connector-count expansion until the product proof moves or a concrete workflow shows one of those items is necessary.
+### M3 — trustworthy derived facts: established inside the trusted runtime boundary
 
-## M0 — Enforcement foundation — complete
+- reviewed extractor contract;
+- exact output hash / ALLOW receipt / execution-evidence agreement;
+- caller cannot choose the strict derived value;
+- Google and GitHub conformance fixtures;
+- tamper/replay/cross-lease/wrong-operation/dangerous-selector tests.
 
-- [x] mission validation
-- [x] allow / deny / require-approval outcomes
-- [x] explicit deny precedence
-- [x] resource constraints
-- [x] expiry and budgets
-- [x] delegation attenuation
-- [x] mission revocation
-- [x] action receipts and request hashes
-- [x] protocol-neutral guard enforcement
-- [x] one-time approvals
-- [x] mutation idempotency
-- [x] short-lived local agent-instance auth
-- [x] encrypted development credential vault
-- [x] GitHub brokered execution
-- [x] MCP v2 gateway proof
-- [x] harness-managed connector grant proof
-- [x] Node 20/22 CI, coverage, package checks and CodeQL
+Still open:
 
-## M1 — Task Lease / derived-authority proof — implementation established
+- [ ] provider-signed or otherwise stronger remote attestation where practical;
+- [ ] source freshness/invalidation semantics where a real workflow requires them.
 
-- [x] Task Lease around an existing Mission
-- [x] explicit authority roots
-- [x] derived facts anchored to same-Mission ALLOW receipts
-- [x] parent-fact lineage
-- [x] exact context-field bindings
-- [x] unresolved facts fail closed
-- [x] resource mismatch becomes an authority-delta step-up
-- [x] explicit Mission deny remains the ceiling
-- [x] task completion immediately removes authority
-- [x] independent Task Lease expiry
-- [x] Task Lease ID/hash in receipts
-- [x] self-contained Gmail-thread -> Calendar-attendee demo
-- [x] reusable Google Gmail/Calendar adapter
-- [x] adversarial Gmail -> Calendar zero-provider-call tests
-- [x] connected-account Gmail -> Calendar smoke proof
-- [ ] public GitHub Actions Gmail -> Calendar proof after repository OAuth secrets are configured
+### M4 — transport invariance: established on demonstrated paths
 
-**Success criterion:** an authorized read can establish exactly one later resource as task authority while an unrelated resource is technically blocked without requiring approval for every normal task step.
+- direct guard/SDK;
+- MCP gateway;
+- brokered provider execution;
+- task-first `task.execute()`;
+- Vercel AI SDK protected-tool path.
 
-The implementation criterion is met. Public Actions reproducibility remains a separate evidence gate because the interactive Google connector credential cannot be reused as repository secrets.
+Changing demonstrated transport must not broaden task authority.
 
-## M2 — Durable task execution — local durable session established
+## Product / DX priorities after Community Preview
 
-- [x] authenticated local Task Lease persistence/recovery
-- [x] exact Mission-hash binding on recovery
-- [x] atomic authenticated fact/binding/status transaction primitive
-- [x] stale-writer compare-and-swap protection
-- [x] local per-lease transaction lock
-- [x] mission-alias hardening inside transactions
-- [x] automatic durable Task Lease session
-- [x] security-critical session refresh before authority evaluation
-- [x] durable completion/expiry across restart
-- [ ] approved authority delta safely updates a live durable task
-- [ ] durable lineage query for one exact authorization decision
-- [ ] stronger multi-process stress/recovery tooling
-- [ ] crash-safe remote-effect/receipt/state coupling
+1. **External onboarding evidence.** Measure time-to-first-protected-effect and where developers get stuck.
+2. **Model-in-the-loop AgentDojo.** Keep official benchmark scores separate from execution-effective side effects.
+3. **Approval-delta UX.** Make a genuine authority expansion understandable and safely resumable.
+4. **Framework starters driven by demand.** Prioritize integrations real adopters request, not connector count.
+5. **TypeScript depth.** Expand declarations beyond the task-first surface when actual consumers use lower-level APIs.
+6. **Provider credential lifecycle.** Add production OAuth/GitHub App/KMS paths when adoption justifies them.
+7. **Remote deployment.** Harden multi-tenant/remote state only after there is a concrete deployment target.
 
-The existing local durability layer is sufficient for product proof. The unchecked items remain research/follow-on work unless a real workflow demonstrates that they block useful adoption or safety.
+## Ecosystem milestone
 
-**Success criterion:** restart and cooperating local workers do not expand authority or silently overwrite newer task state. This is established for the reference local backend.
+After repeatable external adoption:
 
-## M3 — Trustworthy derived facts — two-provider proof established
-
-- [x] reviewed adapter extractor contract
-- [x] successful guarded output bound to exact ALLOW receipt/request/output hash
-- [x] strict `deriveFromEvidence()` where caller cannot provide the authority value
-- [x] Gmail sender -> Calendar attendee strict derivation
-- [x] GitHub issue discovery -> comment strict derivation
-- [x] substitution/tamper/replay/cross-lease/wrong-operation/dangerous-selector tests
-- [x] shared Google/GitHub authority-extractor conformance fixtures
-- [ ] stronger provider/result attestation where a real provider makes it practical
-- [ ] source freshness/invalidation semantics where a real workflow requires it
-
-Do **not** build a general semantic policy language around this primitive.
-
-**Success criterion:** strict provider-derived authority requires agreement between the exact guarded output, ALLOW receipt and reviewed extractor. This is demonstrated across Google and GitHub.
-
-## M4 — Same task, multiple transports — complete
-
-- [x] same Task Lease through direct guard/SDK execution
-- [x] same Task Lease through MCP gateway
-- [x] same Task Lease through brokered provider execution
-- [x] task-first connected-provider execution through `task.execute()`
-- [x] real Vercel AI SDK protected-tool path
-- [x] interoperability/adversarial vectors across transports
-
-Changing transport or configured harness execution path does not expand task authority in the demonstrated paths.
-
-## M5 — Adoption UX — follows product proof, not infrastructure breadth
-
-Prioritize only the UX needed by successful P0 workflows.
-
-- [x] credential-free fresh-install quickstart validated against the current public npm package
-- [x] one low-friction real provider onboarding path: public GitHub read from a blank npm project
-- [x] authenticated connected-provider onboarding path: GitHub stdin credential + encrypted local vault + `task.execute()`
-- [x] safe sole-account default resolution; multiple connected accounts require explicit selection
-- [ ] independent private-repository onboarding proof with a credential that has private-repo access
-- [ ] production provider credential lifecycle / OAuth or GitHub App onboarding where real users require it
-- [ ] compact approval UI showing the exact authority delta
-- [ ] automatic short-lived agent session bootstrap where needed
-- [ ] framework integration starter focused on task-first API
-- [ ] external-developer quickstart feedback loop
-
-Items such as reusable OAuth/OIDC engines, KMS backends and signed-receipt experiments remain optional until product usage justifies them.
-
-**Success criterion:** an external developer can install Agent Authority, connect one real provider, authorize one meaningful task and complete it without exposing a long-lived credential to the model or learning the internal authority machinery first.
-
-## M6 — Ecosystem only after repeatable adoption
-
-- [ ] adapter/conformance starter template
-- [ ] framework examples driven by real user requests
-- [ ] good-first-issue tasks based on proven workflows
-- [ ] independent contributor implementation of one mapping/adapter
-- [x] npm release packaging and registry verification
-- [ ] documentation site only when the current README/docs become genuinely limiting
-
-## M7 — Standards interoperability only after operational evidence
-
-- [ ] map Task Lease concepts to emerging task/intent authorization work
-- [ ] accept external authorization envelopes where useful
-- [ ] avoid creating a competing identity/token standard
-- [ ] publish stable non-amplification/authority-lineage test vectors
-- [ ] evaluate standards participation only after independent implementations/users exist
+- adapter/extractor conformance starter;
+- good-first-issue tasks tied to proven workflow gaps;
+- independent provider mapping implementation;
+- stable authority-lineage/adversarial test vectors;
+- documentation site only when README/docs navigation is actually limiting;
+- standards mapping only after operational evidence exists.
 
 ## Freeze list
 
 Unless a real workflow proves one is necessary now:
 
-- distributed Task Lease databases
-- generic storage abstraction layers
-- provider-signed attestation protocol design
-- new token or identity formats
-- a general delegation protocol
-- proprietary universal policy DSL
-- broad OAuth platform work
-- another MCP control plane
-- A2A protocol implementation
-- connector-count expansion for its own sake
-- full distributed transactions across arbitrary remote providers
-- dashboard-first enterprise product work
+- distributed Task Lease databases;
+- generic persistence abstractions for their own sake;
+- new token or identity formats;
+- proprietary universal policy DSL;
+- broad OAuth platform work;
+- another MCP control plane;
+- A2A implementation;
+- connector-count expansion for its own sake;
+- dashboard-first enterprise product work;
+- full distributed transactions across arbitrary providers;
+- speculative provider-attestation protocols.
 
 ## Research questions
 
-1. Can a first-time developer understand and integrate the task-first model in under 10 minutes?
-2. Which real workflows benefit enough from derived authority that an `if` statement is no longer sufficient?
-3. Where does Agent Authority create unnecessary approval friction or reduce useful task completion?
-4. How should an explicitly approved authority delta update a running task without opening wildcard authority?
-5. Which source-data changes actually require downstream authority invalidation in real workflows?
-6. What remote-effect coupling is necessary in practice, and which providers already offer idempotency/transaction primitives we can reuse instead of inventing our own protocol?
+1. Can a first-time developer understand and integrate task-first authority in under 10 minutes?
+2. Which real workflows benefit enough from derived authority that ordinary application checks are not sufficient?
+3. Where does Agent Authority create false approvals or reduce legitimate task completion?
+4. Can model-in-the-loop AgentDojo attacks produce execution-effective unauthorized effects behind the gate?
+5. How should an approved authority delta update a running durable task without becoming wildcard authority?
+6. Which source-data changes should invalidate downstream authority in practice?
+7. What remote-effect coupling is actually necessary, and which provider idempotency primitives can be reused?
+8. Which additional relation, if any, is justified by external workflow evidence after `exact`, `oneOf` and `max`?

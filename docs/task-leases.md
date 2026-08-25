@@ -1,27 +1,22 @@
 # Task Leases and Derived Authority
 
-Agent Authority's current product thesis is simple:
+Agent Authority's product thesis is:
 
 > Give an agent a task, not standing account permissions.
 
-A **Task Lease** is a temporary enforcement context around an existing mission. The mission remains the maximum authority ceiling. The lease can only narrow that authority as the task discovers concrete resources.
+A **Task Lease** is a temporary enforcement context around an existing Mission. The Mission remains the authority ceiling. The lease can only narrow that authority as the task operates on explicit or discovered resources.
 
-## Why this exists
+## Why Task Leases exist
 
-A human request often does not contain every resource identifier the agent will need.
+A human task often does not contain every resource identifier the agent will need.
 
 Example:
 
 > Handle the demo request in this email thread.
 
-At task start the runtime may know only the Gmail thread ID. During authorized execution it discovers the sender email. That sender may then become the only attendee the agent is allowed to use when creating a calendar event.
+At task start the runtime may know only the Gmail thread ID. During authorized execution it can discover the sender email. That sender may then become the only attendee the task is allowed to use when creating a Calendar event.
 
-Without a task-aware authority layer, the application usually chooses between two bad options:
-
-1. give the agent broad `calendar.write` / `mail.send` permissions; or
-2. ask the human to approve every individual tool call.
-
-Task Leases aim for a third option: **task-bounded autonomy**.
+Task Leases provide **task-bounded autonomy** instead of choosing between broad standing permission and approval on every tool call.
 
 ## Core model
 
@@ -34,54 +29,49 @@ Human-approved task
  authorized execution
         |
         +--> ALLOW receipt
-        +--> exact output hash evidence
+        +--> exact output evidence
         |
         v
- trusted adapter extractor
+ reviewed extractor
         |
         v
   derived facts
         |
- exact action bindings
+ typed task bindings
         |
         v
       effect
 ```
 
-### Authority root
+## Authority roots
 
-A value explicitly trusted at task entry.
+A root is a value explicitly trusted at task entry.
 
 Examples:
 
 - `gmail.thread = thread:91`
-- `github.issue = 42`
+- `github.repository = acme/app`
 - `invoice.id = INV-2026-18`
+- `allowed_channels = [general, random]`
 
-Roots do not require a prior execution receipt because they come from the task's trusted entry boundary.
+Roots do not need a prior execution receipt because they enter through the task's trusted boundary.
 
-### Derived fact
+## Derived facts
 
-A value learned while performing the task.
+A derived fact is learned while performing the task, for example a sender email, issue number, order ID, payment ID or payment amount.
 
-Examples:
+A derived fact must remain in the same Task Lease lineage and descend from existing task authority.
 
-- sender email discovered from an authorized Gmail thread read;
-- customer ID discovered from an authorized support-ticket lookup;
-- order ID discovered from an authorized customer lookup.
+There are two derivation modes:
 
-A derived fact must reference an `ALLOW` receipt from the same Task Lease and at least one parent authority fact.
+- `derive()` — compatibility path where a trusted host supplies the value and selector;
+- `deriveFromEvidence()` — preferred strict path where the caller does **not** supply the authority value.
 
-Agent Authority now exposes two derivation modes:
+For authority-relevant provider data, prefer `deriveFromEvidence()` or the task-first `task.authorityFrom()` facade.
 
-- `derive()` — compatibility path where the trusted host supplies both `value` and `selector`;
-- `deriveFromEvidence()` — stricter path where the host does **not** supply the authority value.
+## Execution evidence
 
-For provider-derived authority, prefer `deriveFromEvidence()`.
-
-### Execution evidence
-
-After an allowed `guard.run()` effect succeeds, the guard returns:
+An allowed guarded effect returns:
 
 ```js
 {
@@ -91,43 +81,41 @@ After an allowed `guard.run()` effect succeeds, the guard returns:
 }
 ```
 
-The execution-evidence record binds:
+Execution evidence binds Mission/Task Lease identity, service/action, request hash, ALLOW receipt identity/hash and a hash of the exact returned output.
 
-- the receipt ID and receipt hash;
-- mission and Task Lease identity;
-- service and action;
-- request hash;
-- a hash of the exact returned output.
+If downstream code changes the output while reusing the original evidence, strict derivation fails.
 
-If downstream code changes the output and tries to reuse the original evidence, derivation fails with `evidence_output_mismatch`.
+This is an integrity mechanism inside the trusted runtime/adapter boundary. It is not remote-provider cryptographic attestation.
 
-This is an integrity mechanism inside the trusted host/runtime boundary. It is **not** provider-signed remote attestation.
+## Reviewed extractors
 
-### Trusted adapter extractor
+A reviewed extractor identifies which normalized provider-output selector may become authority. It returns an extractor ID and selector, not the authority value.
 
-The adapter extractor identifies which normalized provider-output field may become authority.
-
-For Gmail, the current extractor accepts only a `gmail:thread.read` receipt and selects:
+Task Lease verifies the evidence and resolves the selector itself. That blocks the ordinary substitution pattern:
 
 ```text
-output.sender_email
+provider-shaped output says customer@example.com
+caller claims attacker@example.com
+caller tries to reuse original ALLOW evidence
 ```
 
-The extractor returns only an ID and selector. It does not return the authority value.
+The strict path rejects the mismatch because the caller never gets to choose the derived fact value.
 
-Task Lease resolves the selector itself after checking the execution evidence. This prevents ordinary host code from doing this:
+## Bindings and typed relations
+
+A binding narrows an otherwise Mission-permitted action using an authority fact.
+
+The Community Preview supports only three relations:
 
 ```text
-Gmail returned customer@example.com
-host claims attacker@example.com
-while reusing the original Gmail receipt
+exact   request == established fact
+oneOf   request is one member of an established finite set
+max     numeric request <= established numeric ceiling
 ```
 
-The stricter path rejects output/evidence substitution rather than recording the host's claimed value.
+`exact` is the default, so old bindings remain valid.
 
-### Binding
-
-A binding narrows an otherwise permitted action to the exact value held by an authority fact.
+### Exact
 
 ```js
 {
@@ -138,52 +126,67 @@ A binding narrows an otherwise permitted action to the exact value held by an au
 }
 ```
 
-If `fact:requester-email` has not been established, the action is denied.
+If the fact is `customer@example.com`, that attendee can proceed. Another attendee becomes `authority_delta_required`.
 
-If it has value `customer@example.com`, this request can proceed:
-
-```js
-{
-  service: 'calendar',
-  action: 'event.create',
-  context: { attendee_email: 'customer@example.com' }
-}
-```
-
-This request does not proceed automatically:
+### oneOf
 
 ```js
 {
-  service: 'calendar',
-  action: 'event.create',
-  context: { attendee_email: 'other@example.com' }
+  service: 'slack',
+  action: 'add_user_to_channel',
+  context_field: 'channel',
+  fact_id: 'fact:allowed-channels',
+  relation: 'oneOf'
 }
 ```
 
-It returns `REQUIRE_APPROVAL` with `authority_delta_required`.
+If `fact:allowed-channels` contains `['general', 'random']`, only those two concrete channel values match. Another channel requires authority expansion.
+
+`oneOf` was added because the pinned AgentDojo Slack task `user_task_11` exposed exactly this finite-set requirement. We chose a narrow relation instead of a wildcard or general expression language.
+
+### max
+
+```js
+{
+  service: 'payments',
+  action: 'refund.create',
+  context_field: 'amount_minor',
+  fact_id: 'fact:payment-amount',
+  relation: 'max'
+}
+```
+
+If the evidence-derived payment amount is `12500`, a refund request for `5000` or `12500` is inside that per-effect ceiling; `15000` requires authority expansion.
+
+`max` is **not cumulative accounting**. If multiple mutations are possible, provider/application business state and idempotency remain authoritative for aggregate totals.
+
+### Fail-closed behavior
+
+- unknown relation names are rejected;
+- an unresolved fact denies the action;
+- missing bound context denies the action;
+- invalid relation/fact shapes deny the action;
+- a valid but out-of-relation value becomes `authority_delta_required`;
+- blocked/step-up requests do not execute the guarded callback.
 
 ## Non-amplification rule
 
-A Task Lease is not a second policy engine and cannot grant a new action class.
+A Task Lease is not a second permission system that can create new action classes.
 
-The existing mission is always evaluated first.
+The Mission is evaluated first:
 
 ```text
-mission says DENY
+Mission says DENY
       |
       v
 Task Lease cannot override it
 ```
 
-The lease can only add restrictions to an action that the mission already allows.
-
-This is the key invariant:
+Core invariant:
 
 ```text
-lease authority <= mission authority
+Task Lease authority <= Mission authority
 ```
-
-Authority may stay the same or shrink. It must never grow silently.
 
 ## Evidence-verified Gmail -> Calendar example
 
@@ -209,10 +212,7 @@ const lease = createTaskLease({
   ]
 });
 
-const guard = createTaskLeaseGuard({
-  lease,
-  runtime: new AuthorityRuntime()
-});
+const guard = createTaskLeaseGuard({ lease, runtime: new AuthorityRuntime() });
 
 const read = await guard.run({
   service: 'gmail',
@@ -237,84 +237,79 @@ await guard.run({
 }, () => calendar.createEvent({ attendee: senderFact.value }));
 ```
 
-Notice that `deriveFromEvidence()` has no `value` argument. The fact value comes from the exact output already bound to the authorized read.
+`deriveFromEvidence()` has no `value` parameter. The Task Lease resolves the fact from the exact evidence-bound output.
 
-The older `derive()` API remains available for integrations that have not adopted the evidence contract yet. Facts created through that API record `derivation_mode: host-trusted` so audit code can distinguish the weaker path.
-
-## Task completion
-
-Task authority should not outlive the task.
+## Task completion and expiry
 
 ```js
 lease.complete('demo request handled');
 ```
 
-After completion, every guarded action returns `DENY` with `task_lease_completed` even if the underlying OAuth token or provider connection still exists.
+After completion, guarded actions return `task_lease_completed` even if the underlying provider credential still exists.
 
-A lease may also have its own `expires_at` independent of provider credential expiry.
+A lease may also have its own `expires_at`, independent of provider credential expiry.
 
 ## Authority delta
 
-When the agent asks to use a concrete value outside an established binding, Agent Authority returns a step-up signal rather than silently broadening the lease.
+When an otherwise permitted action requests a value outside a binding relation, Agent Authority returns a step-up signal:
 
 ```text
-current task authority
+established task authority
         +
-requested new resource
+requested out-of-relation value
         |
         v
 authority_delta_required
 ```
 
-The existing approval store can handle the human decision. Automatically applying approved deltas to a live Task Lease is a later milestone; the current implementation deliberately stops at the safe enforcement signal.
+The delta records the service, action, context field, relation, requested value and current authority fact ID.
+
+Automatic safe application of an approved delta back into a live durable task remains future work. The current implementation stops at the safe enforcement signal.
+
+## Durable local recovery
+
+Task Lease state is no longer limited to in-memory proof. The repository includes authenticated local persistence/recovery with:
+
+- exact Mission-hash binding;
+- principal/agent validation;
+- authority fact graph/lineage validation;
+- binding persistence including typed relations;
+- durable completion and expiry;
+- local stale-writer compare-and-swap protection;
+- per-lease locking and refresh before security-critical evaluation.
+
+Old snapshots that predate the relation field recover their bindings as `exact`.
+
+This is a trusted-local-host reference implementation, not distributed consensus or a transaction spanning arbitrary remote provider effects.
 
 ## Current security properties
 
-The implementation tests that:
+The test/evidence suite covers:
 
-- a bound action cannot run before its fact exists;
-- derived facts require an `ALLOW` receipt from the same mission and Task Lease;
-- explicit mission denies cannot be overridden by lease bindings;
-- an exact derived resource can execute;
-- a different resource becomes an authority delta and the effect does not run;
-- completed and expired leases stop execution;
-- Task Lease receipts include the lease ID and lease hash;
-- successful guarded effects produce output-bound execution evidence;
-- `deriveFromEvidence()` ignores any caller-supplied `value` and resolves the trusted selector itself;
-- modified provider output is rejected;
-- modified execution evidence is rejected;
-- execution evidence cannot be replayed under another receipt or Task Lease;
-- the Gmail extractor rejects the wrong service/action;
-- dangerous selector paths such as `__proto__` fail closed.
+- Mission ceiling and explicit deny precedence;
+- unresolved facts fail closed;
+- same-Mission / same-Task-Lease derivation lineage;
+- strict output/evidence integrity;
+- replay, tampering and cross-lease substitution rejection;
+- exact / oneOf / max binding behavior;
+- blocked effects executing zero callbacks;
+- durable relation recovery and backward-compatible exact snapshots;
+- completion and expiry;
+- provider extractor operation/selector validation;
+- live GitHub read/mutation boundaries;
+- transport invariance across demonstrated SDK/MCP/broker paths.
+
+See `docs/evidence.md` for the current executable evidence inventory.
 
 ## Current limitations
 
-This is still a validation implementation.
+1. **Trusted adapter/host boundary:** current evidence is not cryptographic remote-provider attestation.
+2. **Bypass paths:** an agent with a separate provider credential/path can bypass Agent Authority.
+3. **Source invalidation:** changes to source resources do not automatically revoke already-derived facts.
+4. **Step-up application:** approved deltas are not yet automatically applied to a live durable task.
+5. **Remote-effect coupling:** arbitrary provider effect + local Task Lease state are not one crash-atomic distributed transaction.
+6. **Relation vocabulary:** only `exact`, `oneOf`, and `max` exist; unsupported workflow shapes should fail visibly rather than trigger a general policy DSL.
+7. **Cumulative state:** `max` is a per-effect ceiling, not a budget/accounting ledger.
+8. **Provider semantics:** every provider integration still needs reviewed operation-to-resource mappings/extractors.
 
-1. **Trusted host/adapter boundary:** execution evidence is produced by Agent Authority around the host effect, not signed by Gmail, Calendar, or another provider. A malicious host that can bypass or replace Agent Authority remains outside the guarantee.
-2. **Provider attestation:** output hashes prove consistency with what the guarded effect returned; they do not cryptographically prove what the remote provider emitted on the wire.
-3. **Source invalidation:** a source resource changing later does not yet invalidate already-derived facts automatically.
-4. **In-memory lease state:** TaskLease instances are currently process-local. Durable lease persistence/recovery is not implemented yet.
-5. **Top-level binding fields:** bindings target top-level request context fields. A general nested policy language is intentionally deferred.
-6. **Step-up application:** authority deltas are surfaced but approved deltas are not yet automatically applied back into the lease.
-7. **Adapter semantics:** each provider still needs a reviewed operation -> authority-field mapping. The Google sender extractor is the first concrete contract.
-
-These constraints are deliberate. The project should improve the evidence contract from real provider cases rather than build a universal semantic policy language.
-
-## Validation target
-
-The longer-term product thesis is validated when the same Task Lease can safely govern a real multi-step workflow across more than one execution transport, for example:
-
-```text
-one human task
-     |
-     +--> ordinary SDK through guard.run()
-     |
-     +--> MCP tool through Agent Authority gateway
-     |
-     +--> brokered provider execution
-
-same authority lineage
-same non-amplification rule
-same completion boundary
-```
+The project should extend these boundaries from real workflow or benchmark evidence rather than speculative authorization machinery.

@@ -24,6 +24,52 @@ function sameValue(a, b) {
   return hashObject(a) === hashObject(b);
 }
 
+const BINDING_RELATIONS = new Set(['exact', 'oneOf', 'max']);
+
+function relationMatch(binding, fact, actual) {
+  if (binding.relation === 'exact') {
+    return { valid: true, matched: sameValue(actual, fact.value) };
+  }
+
+  if (binding.relation === 'oneOf') {
+    if (!Array.isArray(fact.value) || fact.value.length === 0) {
+      return {
+        valid: false,
+        matched: false,
+        reason: `authority fact ${fact.fact_id} must contain a non-empty array for relation oneOf`
+      };
+    }
+    return {
+      valid: true,
+      matched: fact.value.some((allowed) => sameValue(actual, allowed))
+    };
+  }
+
+  if (binding.relation === 'max') {
+    if (typeof fact.value !== 'number' || !Number.isFinite(fact.value)) {
+      return {
+        valid: false,
+        matched: false,
+        reason: `authority fact ${fact.fact_id} must contain a finite number for relation max`
+      };
+    }
+    if (typeof actual !== 'number' || !Number.isFinite(actual)) {
+      return {
+        valid: false,
+        matched: false,
+        reason: `request context.${binding.context_field} must be a finite number for relation max`
+      };
+    }
+    return { valid: true, matched: actual <= fact.value };
+  }
+
+  return {
+    valid: false,
+    matched: false,
+    reason: `unsupported task authority relation ${binding.relation}`
+  };
+}
+
 function requiredString(value, code, message) {
   if (typeof value !== 'string' || value.trim() === '') throw authorityError(code, message);
   return value;
@@ -42,11 +88,16 @@ function validateBinding(binding) {
   if (!binding?.action) throw new Error('binding.action is required');
   if (!binding?.context_field) throw new Error('binding.context_field is required');
   if (!binding?.fact_id) throw new Error('binding.fact_id is required');
+  const relation = binding.relation ?? 'exact';
+  if (!BINDING_RELATIONS.has(relation)) {
+    throw new Error(`binding.relation must be one of: ${[...BINDING_RELATIONS].join(', ')}`);
+  }
   return {
     service: binding.service,
     action: binding.action,
     context_field: binding.context_field,
-    fact_id: binding.fact_id
+    fact_id: binding.fact_id,
+    relation
   };
 }
 
@@ -554,15 +605,26 @@ export class TaskLease {
         return { result, receipt: taskReceipt(this, request, result) };
       }
 
-      if (!sameValue(actual, fact.value)) {
+      const relation = relationMatch(binding, fact, actual);
+      if (!relation.valid) {
+        const result = deny(
+          'authority_relation_invalid',
+          relation.reason,
+          { binding, current_fact_id: fact.fact_id }
+        );
+        return { result, receipt: taskReceipt(this, request, result) };
+      }
+
+      if (!relation.matched) {
         const result = approval(
           'authority_delta_required',
-          `request context.${binding.context_field} is outside the task's derived authority`,
+          `request context.${binding.context_field} is outside the task's ${binding.relation} authority`,
           {
             authority_delta: {
               service: request.service,
               action: request.action,
               context_field: binding.context_field,
+              relation: binding.relation,
               requested_value: actual,
               current_fact_id: fact.fact_id
             }

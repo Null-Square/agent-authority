@@ -16,7 +16,7 @@
     "trainingStatefulAcceptancePct": 100,
     "heldOutFieldwiseAcceptancePct": 20,
     "heldOutStatefulAcceptancePct": 100,
-    "fieldwiseMutantBlockPct": 55.4,
+    "fieldwiseMutantBlockPct": 51.3,
     "statefulMutantBlockPct": 100
   },
   "mutants": {
@@ -25,7 +25,7 @@
     "transplant": { "total": 19, "fieldwiseBlocked": 0, "statefulBlocked": 19 },
     "order": { "total": 20, "fieldwiseBlocked": 0, "statefulBlocked": 20 },
     "action": { "total": 20, "fieldwiseBlocked": 20, "statefulBlocked": 20 },
-    "cross-product": { "total": 1, "fieldwiseBlocked": 0, "statefulBlocked": 1 }
+    "cross-product": { "total": 12, "fieldwiseBlocked": 0, "statefulBlocked": 12 }
   },
   "gates": {
     "representation": true,

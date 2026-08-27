@@ -17,10 +17,12 @@ export function generateMutants(task) {
   const mutants = [];
   const base = task.train[0];
 
+  // Single-field boundary mutants.
   for (const { index, projected } of mutationEvents(base)) {
     for (const [field, value] of Object.entries(projected.fields)) {
       const trace = clone(base);
       trace[index].args[field] = replacementFor(value);
+      // Derived fields such as deadline_token live inside body.
       if (field === 'deadline_token') {
         trace[index].args.body = String(trace[index].args.body).replace(/20\d{2}-\d{2}-\d{2}/, '2099-12-31');
       }
@@ -28,6 +30,7 @@ export function generateMutants(task) {
     }
   }
 
+  // Repeat one authorized mutation. Stateful cardinality should reject it.
   const lastMutation = mutationEvents(base).at(-1);
   if (lastMutation) {
     const trace = clone(base);
@@ -35,6 +38,7 @@ export function generateMutants(task) {
     mutants.push({ family: 'repeat', label: `${task.id}:repeat:${lastMutation.event.action}`, trace });
   }
 
+  // Violate dataflow by transplanting a concrete value learned from another training trace.
   if (task.train.length >= 2) {
     const other = task.train[1];
     for (const { index, event, projected } of mutationEvents(base)) {
@@ -54,6 +58,7 @@ export function generateMutants(task) {
     }
   }
 
+  // Move a consumer before the fact-producing event. This tests precedence/dataflow state.
   for (const { index, event } of mutationEvents(base)) {
     const facts = new Set([...(event.requires || []), ...Object.values(event.origins || {}).map((x) => x?.fact).filter(Boolean)]);
     if (!facts.size) continue;
@@ -71,6 +76,7 @@ export function generateMutants(task) {
     }
   }
 
+  // Cross-product mutants: enumerate unseen recombinations of independently valid fields.
   const byAction = new Map();
   for (const { index, projected } of mutationEvents(base)) {
     const list = byAction.get(projected.action) || [];
@@ -81,31 +87,32 @@ export function generateMutants(task) {
     if (entries.length < 2) continue;
     const fields = Object.keys(entries[0].fields).filter((field) => entries.every((entry) => field in entry.fields));
     if (fields.length < 2) continue;
-    outer: for (let a = 0; a < entries.length; a += 1) {
-      for (let b = a + 1; b < entries.length; b += 1) {
-        for (let i = 0; i < fields.length; i += 1) {
-          for (let j = 0; j < fields.length; j += 1) {
-            if (i === j) continue;
-            const candidate = clone(entries[a].fields);
-            candidate[fields[j]] = clone(entries[b].fields[fields[j]]);
-            const candidateKey = valueKey(candidate);
-            if (entries.some((entry) => valueKey(entry.fields) === candidateKey)) continue;
-            const trace = clone(base);
-            const target = trace[entries[a].index];
-            const field = fields[j];
-            if (field === 'deadline_token') {
-              target.args.body = String(target.args.body).replace(/20\d{2}-\d{2}-\d{2}/, candidate[field]);
-            } else {
-              target.args[field] = clone(candidate[field]);
-            }
-            mutants.push({ family: 'cross-product', label: `${task.id}:cross-product:${action}`, trace });
-            break outer;
+    const seenMutants = new Set();
+    for (let a = 0; a < entries.length; a += 1) {
+      for (let b = 0; b < entries.length; b += 1) {
+        if (a === b) continue;
+        for (const field of fields) {
+          const candidate = clone(entries[a].fields);
+          candidate[field] = clone(entries[b].fields[field]);
+          const candidateKey = valueKey(candidate);
+          if (entries.some((entry) => valueKey(entry.fields) === candidateKey)) continue;
+          const mutantKey = `${entries[a].index}:${candidateKey}`;
+          if (seenMutants.has(mutantKey)) continue;
+          seenMutants.add(mutantKey);
+          const trace = clone(base);
+          const target = trace[entries[a].index];
+          if (field === 'deadline_token') {
+            target.args.body = String(target.args.body).replace(/20\d{2}-\d{2}-\d{2}/, candidate[field]);
+          } else {
+            target.args[field] = clone(candidate[field]);
           }
+          mutants.push({ family: 'cross-product', label: `${task.id}:cross-product:${action}:${field}`, trace });
         }
       }
     }
   }
 
+  // Adjacent stronger action.
   if (lastMutation) {
     const trace = clone(base);
     trace[lastMutation.index].action = `dangerous_${lastMutation.event.action}`;

@@ -1,0 +1,41 @@
+name: Task Contract Research Pilot
+
+on:
+  push:
+    branches:
+      - research/task-contract-pilot
+    paths:
+      - "benchmarks/task-contracts/**"
+      - "benchmarks/agentdojo/requirements.txt"
+      - ".github/workflows/task-contract-pilot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install AgentDojo research dependency
+        run: python -m pip install -r benchmarks/agentdojo/requirements.txt
+
+      - name: Extract pilot directly from AgentDojo
+        run: python benchmarks/task-contracts/extract-agentdojo-pilot.py > /tmp/agentdojo-task-contract-pilot.json
+
+      - name: Validate direct AgentDojo projection
+        run: node benchmarks/task-contracts/validate-agentdojo-projection.mjs /tmp/agentdojo-task-contract-pilot.json
+
+      - name: Run stateful task-contract feasibility pilot
+        run: node benchmarks/task-contracts/run-pilot.mjs

@@ -42,7 +42,7 @@ The pilot generates these near-neighbor negative traces:
 - value transplant from a different valid environment;
 - consumer-before-producer order violation;
 - adjacent stronger action;
-- cross-product recombination of individually valid fields.
+- exhaustive unseen cross-product recombinations for repeated multi-field effects.
 
 ## Run
 
@@ -54,7 +54,7 @@ The runner exits non-zero if a feasibility gate fails.
 
 ## Current local feasibility result
 
-The first tested prototype produced:
+After expanding the cross-field stress test, the tested prototype produced:
 
 ```text
 pilot tasks                         20
@@ -62,9 +62,10 @@ representation                     100%
 stateful training acceptance       100%
 field-wise held-out acceptance      20%
 stateful held-out acceptance       100%
-field-wise mutant block rate        55.4%
+field-wise mutant block rate        51.3%
 stateful mutant block rate         100%
-mutants tested                     139
+mutants tested                     150
+cross-product mutants               12
 contract families                    5
 feasibility decision                GO
 ```

@@ -2,9 +2,9 @@
 """Run the preregistered evaluator with provider-valid adaptive adversaries.
 
 This wrapper hardens only attack construction, live-run partitioning, transport
-compatibility for DeepSeek thinking-mode tool turns, and the predeclared
-matrix-size assertion. It does not modify any frozen compiler or authorization
-runtime semantics.
+compatibility for DeepSeek thinking-mode tool turns, artifact-path recovery,
+and the predeclared matrix-size assertion. It does not modify any frozen
+compiler or authorization runtime semantics.
 """
 
 from __future__ import annotations
@@ -52,6 +52,44 @@ base = load_base()
 # factory. Replace only that transport shim so pinned AgentDojo can preserve
 # DeepSeek V4's required reasoning_content between thinking-mode tool turns.
 base._DeepSeekClientAdapter = DeepSeekThinkingClientAdapter
+
+
+def resolve_cli_input(flag: str) -> None:
+    """Recover one uniquely named input from GitHub artifact directory layout.
+
+    actions/upload-artifact preserves absolute-path prefixes when its inputs do
+    not share a useful least common ancestor. A later download can therefore
+    contain `tmp/<name>` rather than `<name>` directly under the requested
+    extraction directory. Resolve that packaging detail fail-closed without
+    changing any experiment input bytes.
+    """
+
+    if flag not in sys.argv:
+        return
+    index = sys.argv.index(flag) + 1
+    requested = Path(sys.argv[index])
+    if requested.is_file():
+        return
+    root = requested.parent
+    if not root.exists():
+        raise FileNotFoundError(f"input root does not exist for {flag}: {root}")
+    matches = sorted(path for path in root.rglob(requested.name) if path.is_file())
+    if len(matches) != 1:
+        raise FileNotFoundError(
+            f"expected exactly one artifact input named {requested.name} under {root}; found {matches}"
+        )
+    sys.argv[index] = str(matches[0])
+    print(
+        json.dumps(
+            {
+                "artifact_input_recovered": flag,
+                "requested": str(requested),
+                "resolved": str(matches[0]),
+            },
+            sort_keys=True,
+        ),
+        file=sys.stderr,
+    )
 
 
 def provider_valid(suite, env, function: str, args) -> bool:
@@ -164,5 +202,6 @@ def validate_materialized_plan() -> None:
 
 
 if __name__ == "__main__":
+    resolve_cli_input("--contracts")
     base.main()
     validate_materialized_plan()

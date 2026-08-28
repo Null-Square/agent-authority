@@ -1,19 +1,38 @@
 #!/usr/bin/env python3
 """Run the preregistered evaluator with provider-valid adaptive adversaries.
 
-This wrapper hardens only attack construction and live-run partitioning. It does
-not modify any frozen compiler or authorization runtime semantics.
+This wrapper hardens only attack construction, live-run partitioning, and the
+predeclared matrix-size assertion. It does not modify any frozen compiler or
+authorization runtime semantics.
 """
 
 from __future__ import annotations
 
 import copy
 import importlib.util
+import json
 import os
+import sys
 from pathlib import Path
 
 import model_loop_gate as gate
 from agentdojo.functions_runtime import FunctionsRuntime
+
+EXPECTED_PLAN = {
+    "protected_tasks": 60,
+    "standard_attack_pairs_per_trial": 558,
+    "adaptive_targets_per_trial": 230,
+    "adaptive_by_family": {
+        "cross-action": 60,
+        "order": 60,
+        "repeat": 60,
+        "selector-candidate": 4,
+        "transplant": 46,
+    },
+    "cases_per_trial": 1696,
+    "trials": 3,
+    "planned_model_calls": 5088,
+}
 
 
 def load_base():
@@ -106,21 +125,38 @@ if _partition_index is not None or _partition_count is not None:
     partition_index = int(_partition_index)
     partition_count = int(_partition_count)
     if partition_count < 1 or not 0 <= partition_index < partition_count:
-        raise RuntimeError(
-            f"invalid live partition {partition_index}/{partition_count}"
-        )
+        raise RuntimeError(f"invalid live partition {partition_index}/{partition_count}")
     original_entries_for_suite = base.entries_for_suite
 
     def partitioned_entries_for_suite(bundle, suite_name):
         rows = original_entries_for_suite(bundle, suite_name)
-        return [
-            row
-            for index, row in enumerate(rows)
-            if index % partition_count == partition_index
-        ]
+        return [row for index, row in enumerate(rows) if index % partition_count == partition_index]
 
     base.entries_for_suite = partitioned_entries_for_suite
 
 
+def validate_materialized_plan() -> None:
+    if "--mode" not in sys.argv:
+        return
+    mode = sys.argv[sys.argv.index("--mode") + 1]
+    if mode != "plan":
+        return
+    if "--output" not in sys.argv:
+        raise RuntimeError("plan mode requires --output for preregistration validation")
+    output = Path(sys.argv[sys.argv.index("--output") + 1])
+    plan = json.loads(output.read_text(encoding="utf-8"))
+    failures = {}
+    for key, expected in EXPECTED_PLAN.items():
+        actual = plan.get(key)
+        if actual != expected:
+            failures[key] = {"expected": expected, "actual": actual}
+    if failures:
+        raise SystemExit(
+            "materialized live matrix changed after preregistration:\n"
+            + json.dumps(failures, indent=2, sort_keys=True)
+        )
+
+
 if __name__ == "__main__":
     base.main()
+    validate_materialized_plan()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 
@@ -80,6 +80,33 @@ def patch_contract_gate(gate_module) -> None:
     if getattr(cls, "_aggregate_frequency_patched", False):
         return
 
+    # The JavaScript compiler canonicalizes numeric effect values semantically,
+    # while Python JSON preserves 10 and 10.0 as different spellings. Keep the
+    # runtime authorization relation aligned with the compiler's numeric equality.
+    def equivalent(left: Any, right: Any) -> bool:
+        if (
+            isinstance(left, (int, float))
+            and not isinstance(left, bool)
+            and isinstance(right, (int, float))
+            and not isinstance(right, bool)
+        ):
+            return gate_module.nearly_equal(left, right)
+        return gate_module.key(left) == gate_module.key(right)
+
+    def value_allowed(allowed: Sequence[Any], value: Any) -> bool:
+        return any(equivalent(candidate, value) for candidate in allowed or [])
+
+    def tuple_allowed(tuples: Sequence[Mapping[str, Any]], fields: Mapping[str, Any]) -> bool:
+        if not tuples:
+            return True
+        return any(
+            all(field in fields and equivalent(fields[field], value) for field, value in row.items())
+            for row in tuples
+        )
+
+    gate_module.value_allowed = value_allowed
+    gate_module.tuple_allowed = tuple_allowed
+
     original_decision = cls._decision
 
     def aggregate_decision(self, function: str, kwargs: Mapping[str, Any]):
@@ -97,7 +124,7 @@ def patch_contract_gate(gate_module) -> None:
                     return False, f"aggregate_target_missing:{field}"
                 aggregate = aggregate_frequency_winner(self.history, constraint.get("witness") or {})
                 winner = aggregate.get("winner")
-                if winner is None or gate_module.key(winner) != gate_module.key(fields[field]):
+                if winner is None or not equivalent(winner, fields[field]):
                     return False, f"aggregate_selection_witness_mismatch:{field}:{aggregate.get('reason') or 'wrong_winner'}"
         return original_decision(self, function, kwargs)
 

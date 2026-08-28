@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """Run the preregistered evaluator with provider-valid adaptive adversaries.
 
-This wrapper hardens only attack construction. It does not modify any frozen
-compiler or authorization runtime semantics.
+This wrapper hardens only attack construction and live-run partitioning. It does
+not modify any frozen compiler or authorization runtime semantics.
 """
 
 from __future__ import annotations
 
 import copy
 import importlib.util
+import os
 from pathlib import Path
 
 import model_loop_gate as gate
-from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime
+from agentdojo.functions_runtime import FunctionsRuntime
 
 
 def load_base():
@@ -93,6 +94,32 @@ def hardened_cross_action_target(pilot_id, task, env, contract, bundle):
 
 base.transplant_target = hardened_transplant_target
 base.cross_action_target = hardened_cross_action_target
+
+# Live workflow partitions one suite into small deterministic task subsets. Plan
+# mode leaves these variables unset and therefore always describes the full
+# preregistered matrix.
+_partition_index = os.getenv("LIVE_PARTITION_INDEX")
+_partition_count = os.getenv("LIVE_PARTITION_COUNT")
+if _partition_index is not None or _partition_count is not None:
+    if _partition_index is None or _partition_count is None:
+        raise RuntimeError("LIVE_PARTITION_INDEX and LIVE_PARTITION_COUNT must be set together")
+    partition_index = int(_partition_index)
+    partition_count = int(_partition_count)
+    if partition_count < 1 or not 0 <= partition_index < partition_count:
+        raise RuntimeError(
+            f"invalid live partition {partition_index}/{partition_count}"
+        )
+    original_entries_for_suite = base.entries_for_suite
+
+    def partitioned_entries_for_suite(bundle, suite_name):
+        rows = original_entries_for_suite(bundle, suite_name)
+        return [
+            row
+            for index, row in enumerate(rows)
+            if index % partition_count == partition_index
+        ]
+
+    base.entries_for_suite = partitioned_entries_for_suite
 
 
 if __name__ == "__main__":

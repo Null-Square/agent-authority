@@ -34,6 +34,9 @@ jobs:
       - name: Survey all AgentDojo user tasks
         run: python benchmarks/task-contracts/survey-agentdojo-coverage.py > /tmp/agentdojo-coverage-survey.json
 
+      - name: Summarize full-suite authority coverage
+        run: node benchmarks/task-contracts/summarize-agentdojo-coverage.mjs /tmp/agentdojo-coverage-survey.json > /tmp/agentdojo-coverage-summary.json
+
       - name: Extract and execute pilot directly from AgentDojo
         run: python benchmarks/task-contracts/extract-agentdojo-pilot.py > /tmp/agentdojo-task-contract-pilot.json
 
@@ -76,5 +79,6 @@ jobs:
             /tmp/task-contract-strict.json
             /tmp/task-contract-selector-witness.json
             /tmp/agentdojo-coverage-survey.json
+            /tmp/agentdojo-coverage-summary.json
           if-no-files-found: error
           retention-days: 30

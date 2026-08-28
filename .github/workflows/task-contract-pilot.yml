@@ -31,11 +31,14 @@ jobs:
       - name: Install AgentDojo research dependency
         run: python -m pip install -r benchmarks/agentdojo/requirements.txt
 
-      - name: Extract pilot directly from AgentDojo
+      - name: Extract and execute pilot directly from AgentDojo
         run: python benchmarks/task-contracts/extract-agentdojo-pilot.py > /tmp/agentdojo-task-contract-pilot.json
 
       - name: Validate direct AgentDojo projection
         run: node benchmarks/task-contracts/validate-agentdojo-projection.mjs /tmp/agentdojo-task-contract-pilot.json
+
+      - name: Recover lineage from authorized execution evidence
+        run: node benchmarks/task-contracts/analyze-automatic-lineage.mjs /tmp/agentdojo-task-contract-pilot.json
 
       - name: Run stateful task-contract feasibility pilot
         run: node benchmarks/task-contracts/run-pilot.mjs

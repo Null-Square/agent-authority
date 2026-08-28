@@ -1,0 +1,1 @@
+This branch is executing the strict output-or-selection-witness research gate. The strict compiler must preserve evidence-consistent counterfactual utility and reject circular request-provenance mutations without task-specific exceptions.

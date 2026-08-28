@@ -16,7 +16,7 @@ permissions:
 jobs:
   pilot:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -40,8 +40,21 @@ jobs:
       - name: Build unbiased schema-covered cohort
         run: node benchmarks/task-contracts/build-agentdojo-expanded-cohort.mjs /tmp/agentdojo-coverage-survey.json /tmp/agentdojo-expanded-cohort.json
 
+      - name: Emit strict runtime contracts
+        run: node benchmarks/task-contracts/emit-strict-contracts.mjs /tmp/agentdojo-expanded-cohort.json /tmp/task-contract-runtime-bundle.json
+
       - name: Run strict compiler on expanded schema-covered cohort
         run: node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs /tmp/agentdojo-expanded-cohort.json > /tmp/task-contract-strict-expanded.json
+
+      - name: Run compromised-agent provider-boundary gate
+        run: python benchmarks/task-contracts/model_loop_gate.py --contracts /tmp/task-contract-runtime-bundle.json --mode deterministic > /tmp/task-contract-provider-boundary.json
+
+      - name: Run optional real AgentDojo model arm
+        continue-on-error: true
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AGENTDOJO_MODEL: gpt-4o-mini-2024-07-18
+        run: python benchmarks/task-contracts/model_loop_gate.py --contracts /tmp/task-contract-runtime-bundle.json --mode real > /tmp/task-contract-real-model.json
 
       - name: Extract and execute pilot directly from AgentDojo
         run: python benchmarks/task-contracts/extract-agentdojo-pilot.py > /tmp/agentdojo-task-contract-pilot.json
@@ -85,6 +98,9 @@ jobs:
             /tmp/task-contract-strict.json
             /tmp/task-contract-strict-expanded.json
             /tmp/task-contract-selector-witness.json
+            /tmp/task-contract-provider-boundary.json
+            /tmp/task-contract-real-model.json
+            /tmp/task-contract-runtime-bundle.json
             /tmp/agentdojo-coverage-survey.json
             /tmp/agentdojo-coverage-summary.json
             /tmp/agentdojo-expanded-cohort.json

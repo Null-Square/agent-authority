@@ -1,2 +1,3 @@
 trigger live-eval-v1
 requested after DEEPSEEK_API_KEY configuration
+rerun after thinking-mode transport bridge validation

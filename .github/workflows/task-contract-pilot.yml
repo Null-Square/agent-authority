@@ -38,13 +38,31 @@ jobs:
         run: node benchmarks/task-contracts/validate-agentdojo-projection.mjs /tmp/agentdojo-task-contract-pilot.json
 
       - name: Recover lineage from authorized execution evidence
-        run: node benchmarks/task-contracts/analyze-automatic-lineage.mjs /tmp/agentdojo-task-contract-pilot.json
+        run: node benchmarks/task-contracts/analyze-automatic-lineage.mjs /tmp/agentdojo-task-contract-pilot.json > /tmp/task-contract-lineage.json
 
       - name: Diagnose automatic contract safety misses
-        run: node benchmarks/task-contracts/diagnose-automatic-contract.mjs /tmp/agentdojo-task-contract-pilot.json
+        run: node benchmarks/task-contracts/diagnose-automatic-contract.mjs /tmp/agentdojo-task-contract-pilot.json > /tmp/task-contract-diagnostics.json
 
       - name: Run annotation-free automatic contract gate
-        run: node benchmarks/task-contracts/run-automatic-contract-pilot.mjs /tmp/agentdojo-task-contract-pilot.json
+        run: node benchmarks/task-contracts/run-automatic-contract-pilot.mjs /tmp/agentdojo-task-contract-pilot.json > /tmp/task-contract-automatic.json
 
       - name: Run annotated stateful reference pilot
-        run: node benchmarks/task-contracts/run-pilot.mjs
+        run: node benchmarks/task-contracts/run-pilot.mjs > /tmp/task-contract-reference.json
+
+      - name: Build compact research checkpoint
+        run: |
+          node benchmarks/task-contracts/summarize-checkpoint.mjs \
+            /tmp/task-contract-lineage.json \
+            /tmp/task-contract-automatic.json \
+            /tmp/task-contract-reference.json \
+            /tmp/task-contract-checkpoint.json
+
+      - name: Upload research checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-contract-checkpoint
+          path: |
+            /tmp/task-contract-checkpoint.json
+            /tmp/task-contract-diagnostics.json
+          if-no-files-found: error
+          retention-days: 30

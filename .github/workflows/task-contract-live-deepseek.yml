@@ -2,6 +2,11 @@ name: Task Authority Live DeepSeek Evaluation
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - research/task-contract-pilot
+    paths:
+      - ".github/task-authority-live-trigger.txt"
 
 permissions:
   contents: read

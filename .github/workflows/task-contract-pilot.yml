@@ -91,12 +91,21 @@ jobs:
             > /tmp/task-contract-provider-perfect.json
 
       - name: Run optional DeepSeek AgentDojo model arm
-        continue-on-error: true
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           DEEPSEEK_BASE_URL: https://api.deepseek.com
           DEEPSEEK_MODEL: deepseek-v4-flash
         run: python benchmarks/task-contracts/model_loop_gate_deepseek.py --contracts /tmp/task-contract-runtime-bundle.json --mode real > /tmp/task-contract-deepseek-model.json
+
+      - name: Validate live DeepSeek result when configured
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "DeepSeek secret not configured; live arm remains optional."
+            exit 0
+          fi
+          node benchmarks/task-contracts/validate-deepseek-live.mjs /tmp/task-contract-deepseek-model.json > /tmp/task-contract-deepseek-validated.json
 
       - name: Run optional OpenAI AgentDojo model arm
         continue-on-error: true
@@ -155,6 +164,7 @@ jobs:
             /tmp/task-contract-aggregate-provider.json
             /tmp/task-contract-provider-perfect.json
             /tmp/task-contract-deepseek-model.json
+            /tmp/task-contract-deepseek-validated.json
             /tmp/task-contract-real-model.json
             /tmp/task-contract-runtime-bundle.json
             /tmp/agentdojo-coverage-survey.json

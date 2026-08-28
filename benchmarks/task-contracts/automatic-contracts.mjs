@@ -1,5 +1,5 @@
-import { AUTHORITY_SCHEMAS } from './fixtures.mjs';
-import { clone, projectMutation, valueKey } from './contracts.mjs';
+import { AUTHORITY_SCHEMAS } from './authority-schemas.mjs';
+import { clone, projectMutation, valueKey } from './projection.mjs';
 
 const DYNAMIC_ROLES = new Set(['destination', 'resource', 'numeric_effect', 'resource_context']);
 const ROOT_BY_DEFAULT_ROLES = new Set(['identity', 'mode', 'temporal', 'created_resource_name', 'structured_content_anchor']);
@@ -130,18 +130,124 @@ function arithmeticCandidates(trace, targetIndex, targetValue, prompt) {
   return candidates;
 }
 
+function scalarCandidateSet(value) {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  if (!value.every((item) => ['string', 'number'].includes(typeof item))) return null;
+  const unique = [...new Map(value.map((item) => [valueKey(item), item])).values()];
+  return unique.length >= 2 ? unique : null;
+}
+
+function parsePrefixSelector(prompt) {
+  const text = String(prompt || '');
+  const match = text.match(/\b(?:starting|starts|beginning|begins)\s+with\s+["'“”]?([A-Za-z0-9_-]+)/i);
+  return match?.[1] || null;
+}
+
+function parseExtremumSelector(prompt) {
+  const text = String(prompt || '').toLowerCase();
+  if (/\b(smallest|fewest|least|lowest|minimum|minimal)\b/.test(text)) return 'min';
+  if (/\b(most|largest|highest|maximum|maximal)\b/.test(text)) return 'max';
+  return null;
+}
+
+function resultCardinality(value) {
+  if (Array.isArray(value)) return value.length;
+  if (value && typeof value === 'object') return Object.keys(value).length;
+  return null;
+}
+
+function selectorCandidates(trace, targetIndex, targetValue, prompt) {
+  const candidates = [];
+  const prefix = parsePrefixSelector(prompt);
+  const extremum = parseExtremumSelector(prompt);
+
+  for (let sourceIndex = 0; sourceIndex < targetIndex; sourceIndex += 1) {
+    const source = trace[sourceIndex];
+    const values = scalarCandidateSet(source.result);
+    if (!values || !values.some((value) => valueKey(value) === valueKey(targetValue))) continue;
+
+    if (prefix && typeof targetValue === 'string') {
+      const matches = values.filter((value) => typeof value === 'string' && value.toLowerCase().startsWith(prefix.toLowerCase()));
+      if (matches.length === 1 && valueKey(matches[0]) === valueKey(targetValue)) {
+        candidates.push({
+          index: sourceIndex,
+          action: source.action,
+          channel: 'output',
+          match: 'selector-prefix',
+          score: 90,
+          witness: { kind: 'prefix', prefix, candidateSourceAction: source.action }
+        });
+      }
+    }
+
+    if (extremum) {
+      const measurements = new Map();
+      const measurementActions = new Set();
+      for (const value of values) {
+        for (let measureIndex = sourceIndex + 1; measureIndex < targetIndex; measureIndex += 1) {
+          const measurement = trace[measureIndex];
+          if (!containsExact(measurement.args, value)) continue;
+          const cardinality = resultCardinality(measurement.result);
+          if (cardinality === null) continue;
+          measurements.set(valueKey(value), { value, cardinality, index: measureIndex, action: measurement.action });
+          measurementActions.add(measurement.action);
+          break;
+        }
+      }
+      if (measurements.size !== values.length) continue;
+      const rows = [...measurements.values()];
+      const best = extremum === 'min'
+        ? Math.min(...rows.map((row) => row.cardinality))
+        : Math.max(...rows.map((row) => row.cardinality));
+      const winners = rows.filter((row) => row.cardinality === best);
+      if (winners.length === 1 && valueKey(winners[0].value) === valueKey(targetValue)) {
+        candidates.push({
+          index: sourceIndex,
+          action: source.action,
+          channel: 'output',
+          match: extremum === 'min' ? 'selector-min-cardinality' : 'selector-max-cardinality',
+          score: 95,
+          witness: {
+            kind: 'extremum-cardinality',
+            direction: extremum,
+            candidateSourceAction: source.action,
+            measurementActions: [...measurementActions].sort()
+          }
+        });
+      }
+    }
+  }
+
+  return candidates;
+}
+
+function isAmbiguousScalarMembership(container, target) {
+  const values = scalarCandidateSet(container);
+  return Boolean(values && values.some((value) => valueKey(value) === valueKey(target)));
+}
+
 export function inferSource(trace, targetIndex, targetValue, prompt, restrictions = {}) {
   const candidates = [];
   const sourceActions = restrictions.sourceActions ? new Set(restrictions.sourceActions) : null;
   const matchKinds = restrictions.matchKinds ? new Set(restrictions.matchKinds) : null;
+
+  for (const candidate of selectorCandidates(trace, targetIndex, targetValue, prompt)) {
+    if (sourceActions && !sourceActions.has(candidate.action)) continue;
+    if (matchKinds && !matchKinds.has(candidate.match)) continue;
+    candidates.push(candidate);
+  }
 
   for (let index = 0; index < targetIndex; index += 1) {
     const event = trace[index];
     if (sourceActions && !sourceActions.has(event.action)) continue;
     const output = evidenceMatch(event.result, targetValue);
     if (output.matched && (!matchKinds || matchKinds.has(output.kind))) {
-      const scores = { exact: 50, numeric: 48, identity: 46, component: 40 };
-      candidates.push({ index, action: event.action, channel: 'output', match: output.kind, score: scores[output.kind] || 40 });
+      // A value merely being one member of a multi-candidate scalar set is not
+      // sufficient authority. A task-rooted selector witness must justify it.
+      if (!isAmbiguousScalarMembership(event.result, targetValue)) {
+        const scores = { exact: 50, numeric: 48, identity: 46, component: 40 };
+        candidates.push({ index, action: event.action, channel: 'output', match: output.kind, score: scores[output.kind] || 40 });
+      }
     }
     const request = evidenceMatch(event.args, targetValue);
     if (request.matched && (!matchKinds || matchKinds.has(request.kind))) {
@@ -216,13 +322,24 @@ export function compileAutomaticContract(source) {
         const eligibility = shouldAttemptBinding(source.prompt, action, field, value);
         const inferred = eligibility.eligible ? inferSource(trace, instance.index, value, source.prompt) : null;
         if (inferred) {
-          const entry = dynamic.get(field) || { sourceActions: new Set(), matchKinds: new Set(), role: eligibility.role };
+          const entry = dynamic.get(field) || { sourceActions: new Set(), matchKinds: new Set(), role: eligibility.role, witnesses: new Map() };
           entry.sourceActions.add(inferred.action);
           entry.matchKinds.add(inferred.match);
+          if (inferred.witness) entry.witnesses.set(valueKey(inferred.witness), clone(inferred.witness));
           dynamic.set(field, entry);
-          bindings.push({ targetIndex: instance.index, action, field, value: clone(value), sourceIndex: inferred.index, sourceAction: inferred.action, match: inferred.match, role: eligibility.role });
+          bindings.push({
+            targetIndex: instance.index,
+            action,
+            field,
+            value: clone(value),
+            sourceIndex: inferred.index,
+            sourceAction: inferred.action,
+            match: inferred.match,
+            witness: inferred.witness ? clone(inferred.witness) : null,
+            role: eligibility.role
+          });
         } else {
-          if (eligibility.eligible) unresolved.push({ targetIndex: instance.index, action, field, value: clone(value), role: eligibility.role });
+          if (eligibility.eligible) unresolved.push({ targetIndex: instance.index, action, field, value: clone(value), role: eligibility.role, disposition: 'static-fence' });
           const allowed = fields.get(field) || new Map();
           allowed.set(valueKey(value), clone(value));
           fields.set(field, allowed);
@@ -239,7 +356,8 @@ export function compileAutomaticContract(source) {
       dynamic: Object.fromEntries([...dynamic.entries()].map(([field, spec]) => [field, {
         role: spec.role,
         sourceActions: [...spec.sourceActions].sort(),
-        matchKinds: [...spec.matchKinds].sort()
+        matchKinds: [...spec.matchKinds].sort(),
+        witnesses: [...spec.witnesses.values()]
       }])),
       tuples: distinctTuples.size > 1 ? [...distinctTuples.values()] : [],
       precedenceActions: [...intersection(instances.map((instance) => instance.priorReadActions))].sort()

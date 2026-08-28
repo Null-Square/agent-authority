@@ -1,0 +1,178 @@
+name: Task Authority Live DeepSeek Evaluation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pinned AgentDojo
+        run: python -m pip install -r benchmarks/agentdojo/requirements.txt
+
+      - name: Verify frozen V1 mechanism
+        run: |
+          python benchmarks/task-contracts/validate-mechanism-freeze.py \
+            benchmarks/task-contracts/live-eval-freeze.json \
+            > /tmp/live-eval-freeze-validation.json
+
+      - name: Compile publication evaluator
+        run: |
+          python -m py_compile \
+            benchmarks/task-contracts/deepseek-publication-eval.py \
+            benchmarks/task-contracts/run-deepseek-publication-eval.py \
+            benchmarks/task-contracts/aggregate-deepseek-publication-eval.py \
+            benchmarks/task-contracts/validate-mechanism-freeze.py
+
+      - name: Survey AgentDojo and build frozen 60-task cohort
+        run: |
+          python benchmarks/task-contracts/survey-agentdojo-coverage.py > /tmp/agentdojo-coverage-survey.json
+          node benchmarks/task-contracts/build-agentdojo-expanded-cohort.mjs \
+            /tmp/agentdojo-coverage-survey.json \
+            /tmp/agentdojo-expanded-cohort.json
+          node benchmarks/task-contracts/emit-strict-contracts.mjs \
+            /tmp/agentdojo-expanded-cohort.json \
+            /tmp/task-contract-runtime-bundle.json
+
+      - name: Materialize preregistered live plan
+        run: |
+          python benchmarks/task-contracts/run-deepseek-publication-eval.py \
+            --contracts /tmp/task-contract-runtime-bundle.json \
+            --mode plan \
+            --suite all \
+            --trial 0 \
+            --output /tmp/live-eval-plan.json
+
+      - name: Upload frozen live inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-eval-inputs
+          path: |
+            /tmp/task-contract-runtime-bundle.json
+            /tmp/live-eval-plan.json
+            /tmp/live-eval-freeze-validation.json
+            benchmarks/task-contracts/live-eval-freeze.json
+            benchmarks/task-contracts/LIVE_EVAL_PROTOCOL.md
+          if-no-files-found: error
+          retention-days: 30
+
+  live:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        suite: [slack, banking, workspace, travel]
+        trial: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pinned AgentDojo
+        run: python -m pip install -r benchmarks/agentdojo/requirements.txt
+
+      - name: Verify frozen V1 mechanism
+        run: python benchmarks/task-contracts/validate-mechanism-freeze.py benchmarks/task-contracts/live-eval-freeze.json
+
+      - name: Download frozen live inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: live-eval-inputs
+          path: /tmp/live-inputs
+
+      - name: Run DeepSeek Pro live shard
+        id: live_run
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_BASE_URL: https://api.deepseek.com
+          DEEPSEEK_MODEL: deepseek-v4-pro
+          LIVE_SUITE: ${{ matrix.suite }}
+          LIVE_TRIAL: ${{ matrix.trial }}
+        run: |
+          set +e
+          output="/tmp/live-shard-${LIVE_SUITE}-${LIVE_TRIAL}.json"
+          python benchmarks/task-contracts/run-deepseek-publication-eval.py \
+            --contracts /tmp/live-inputs/task-contract-runtime-bundle.json \
+            --mode run \
+            --suite "$LIVE_SUITE" \
+            --trial "$LIVE_TRIAL" \
+            --model deepseek-v4-pro \
+            --output "$output"
+          status=$?
+          if [ ! -s "$output" ]; then
+            printf '{"protocol":"live-eval-v1","mode":"live-shard","model":"deepseek-v4-pro","suite":"%s","trial":%s,"rows":[],"startup_error":true}\n' \
+              "$LIVE_SUITE" "$LIVE_TRIAL" > "$output"
+          fi
+          exit "$status"
+
+      - name: Upload live shard checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-shard-${{ matrix.suite }}-${{ matrix.trial }}
+          path: /tmp/live-shard-${{ matrix.suite }}-${{ matrix.trial }}.json
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate:
+    if: always() && needs.prepare.result == 'success'
+    needs: [prepare, live]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download frozen live inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: live-eval-inputs
+          path: /tmp/live-inputs
+
+      - name: Download all live shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: live-shard-*
+          path: /tmp/live-shards
+          merge-multiple: true
+
+      - name: Aggregate preregistered result
+        run: |
+          python benchmarks/task-contracts/aggregate-deepseek-publication-eval.py \
+            /tmp/live-shards/live-shard-*.json \
+            --plan /tmp/live-inputs/live-eval-plan.json \
+            --output /tmp/live-eval-result.json
+
+      - name: Upload publication-grade live result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-authority-live-deepseek-result
+          path: |
+            /tmp/live-eval-result.json
+            /tmp/live-inputs/live-eval-plan.json
+            /tmp/live-inputs/live-eval-freeze-validation.json
+            /tmp/live-shards/live-shard-*.json
+          if-no-files-found: warn
+          retention-days: 30

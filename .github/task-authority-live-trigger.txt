@@ -2,3 +2,4 @@ trigger live-eval-v1
 requested after DEEPSEEK_API_KEY configuration
 rerun after thinking-mode transport bridge validation
 rerun after artifact input path recovery validation
+rerun after exact adaptive payload delivery validation

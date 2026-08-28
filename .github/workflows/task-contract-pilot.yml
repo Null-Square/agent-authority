@@ -49,10 +49,10 @@ jobs:
       - name: Run compromised-agent provider-boundary gate
         run: python benchmarks/task-contracts/model_loop_gate_identity_adversary.py --contracts /tmp/task-contract-runtime-bundle.json --mode deterministic > /tmp/task-contract-provider-boundary.json
 
-      - name: Stress provider boundary with adversarial trajectory families
+      - name: Stress provider boundary with attempt-exact adversarial trajectories
         run: |
           set -o pipefail
-          python benchmarks/task-contracts/provider_attack_family_gate.py --contracts /tmp/task-contract-runtime-bundle.json | tee /tmp/task-contract-provider-families.json
+          python benchmarks/task-contracts/provider_attack_family_gate_v2.py --contracts /tmp/task-contract-runtime-bundle.json | tee /tmp/task-contract-provider-families.json
 
       - name: Run optional real AgentDojo model arm
         continue-on-error: true

@@ -39,6 +39,13 @@ def run_deepseek(bundle, _model):
 
     client = openai.OpenAI(api_key=api_key, base_url=base_url)
     llm = OpenAILLM(client, model_id)
+
+    # AgentDojo 0.1.35's attack registry requires a named target pipeline.
+    # Custom BasePipelineElement instances can otherwise leave the generated
+    # pipeline name as None, which prevents the attack from being constructed
+    # before any model/API request is made. This is evaluation-adapter metadata
+    # only; it does not alter task-contract or authorization semantics.
+    llm.name = model_id
     pipeline = gate.AgentPipeline.from_config(
         gate.PipelineConfig(
             llm=llm,
@@ -50,6 +57,7 @@ def run_deepseek(bundle, _model):
             tool_output_format=None,
         )
     )
+    pipeline.name = model_id
 
     rows = []
     for suite_name, task_ids in gate.REAL_TASKS.items():

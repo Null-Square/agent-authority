@@ -37,6 +37,12 @@ jobs:
       - name: Summarize full-suite authority coverage
         run: node benchmarks/task-contracts/summarize-agentdojo-coverage.mjs /tmp/agentdojo-coverage-survey.json > /tmp/agentdojo-coverage-summary.json
 
+      - name: Build unbiased schema-covered cohort
+        run: node benchmarks/task-contracts/build-agentdojo-expanded-cohort.mjs /tmp/agentdojo-coverage-survey.json /tmp/agentdojo-expanded-cohort.json
+
+      - name: Run strict compiler on expanded schema-covered cohort
+        run: node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs /tmp/agentdojo-expanded-cohort.json > /tmp/task-contract-strict-expanded.json
+
       - name: Extract and execute pilot directly from AgentDojo
         run: python benchmarks/task-contracts/extract-agentdojo-pilot.py > /tmp/agentdojo-task-contract-pilot.json
 
@@ -77,8 +83,10 @@ jobs:
             /tmp/task-contract-checkpoint.json
             /tmp/task-contract-diagnostics.json
             /tmp/task-contract-strict.json
+            /tmp/task-contract-strict-expanded.json
             /tmp/task-contract-selector-witness.json
             /tmp/agentdojo-coverage-survey.json
             /tmp/agentdojo-coverage-summary.json
+            /tmp/agentdojo-expanded-cohort.json
           if-no-files-found: error
           retention-days: 30

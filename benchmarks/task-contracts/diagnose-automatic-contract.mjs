@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 
-import { clone, projectMutation, valueKey } from './contracts.mjs';
+import { clone, projectMutation, valueKey } from './projection.mjs';
 import { compileAutomaticContract, directTrace, evaluateAutomaticContract } from './automatic-contracts.mjs';
 
 const path = process.argv[2];
@@ -22,6 +22,14 @@ function replacementFor(value, salt = 1) {
     return Object.fromEntries(Object.entries(value).map(([key, item], index) => [key, replacementFor(item, salt + index)]));
   }
   return `variant-${salt}`;
+}
+
+function replacementForField(field, value, salt) {
+  if (field === 'deadline_token') {
+    const day = String((salt % 27) + 1).padStart(2, '0');
+    return `2099-12-${day}`;
+  }
+  return replacementFor(value, salt);
 }
 
 function setProjectedField(event, field, value) {
@@ -52,17 +60,18 @@ function buildCatalog(tasks) {
 }
 
 const catalog = buildCatalog(direct.tasks);
-const report = { allowedFieldMutants: [], allowedTransplants: [], unresolved: [], contracts: [] };
+const report = { allowedFieldMutants: [], allowedTransplants: [], unresolved: [], selectors: [], contracts: [] };
 
 for (const source of direct.tasks) {
   const contract = compileAutomaticContract(source);
   const base = directTrace(source);
   report.unresolved.push(...contract.metadata.unresolved.map((item) => ({ task: source.pilot_id, ...item })));
+  report.selectors.push(...contract.metadata.bindings.filter((binding) => binding.match.startsWith('selector-')).map((binding) => ({ task: source.pilot_id, ...binding })));
 
   for (const { index, projected } of mutationEvents(base)) {
     for (const [field, value] of Object.entries(projected.fields)) {
       const trace = clone(base);
-      const replacement = replacementFor(value, index + 100);
+      const replacement = replacementForField(field, value, index + 100);
       setProjectedField(trace[index], field, replacement);
       const evaluation = evaluateAutomaticContract(contract, trace);
       if (evaluation.allowed) {
@@ -100,6 +109,7 @@ for (const source of direct.tasks) {
         learnedSourceIndex: binding.sourceIndex,
         learnedSourceAction: binding.sourceAction,
         learnedMatch: binding.match,
+        learnedWitness: binding.witness || null,
         dynamicRule: contract.actions[binding.action]?.dynamic?.[binding.field] || null
       });
     }
@@ -116,7 +126,8 @@ for (const source of direct.tasks) {
 report.summary = {
   allowedFieldMutants: report.allowedFieldMutants.length,
   allowedTransplants: report.allowedTransplants.length,
-  unresolved: report.unresolved.length
+  unresolved: report.unresolved.length,
+  selectorBindings: report.selectors.length
 };
 
 console.log(JSON.stringify(report, null, 2));

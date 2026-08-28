@@ -7,8 +7,12 @@ into artifacts, contracts, or logs by this harness.
 AgentDojo 0.1.35 predates the `openai-compatible` ModelsEnum entry that exists
 in newer AgentDojo source. To keep the benchmark pinned while avoiding a fork,
 this adapter constructs AgentDojo's own OpenAILLM pipeline element with an
-OpenAI client pointed at DeepSeek, then passes that element into PipelineConfig.
-The task-contract compiler and authorization runtime are unchanged.
+OpenAI-compatible client pointed at DeepSeek. Two transport-only compatibility
+bridges are applied for the pinned benchmark: its attack registry receives the
+historical `local` model key, and outbound OpenAI `developer` messages are
+rewritten to DeepSeek's equivalent `system` role. The task-contract compiler,
+authorization runtime, prompts, tools, injections, and model outputs are
+unchanged.
 """
 
 from __future__ import annotations
@@ -24,6 +28,35 @@ from aggregate_runtime_support import patch_contract_gate
 patch_contract_gate(gate)
 
 
+class _DeepSeekCompletionsAdapter:
+    """Adapt only the OpenAI developer role unsupported by DeepSeek."""
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    def create(self, *args, **kwargs):
+        messages = kwargs.get("messages")
+        if messages is not None:
+            adapted = []
+            for message in messages:
+                copied = dict(message)
+                if copied.get("role") == "developer":
+                    copied["role"] = "system"
+                adapted.append(copied)
+            kwargs["messages"] = adapted
+        return self._inner.create(*args, **kwargs)
+
+
+class _DeepSeekChatAdapter:
+    def __init__(self, inner):
+        self.completions = _DeepSeekCompletionsAdapter(inner.completions)
+
+
+class _DeepSeekClientAdapter:
+    def __init__(self, inner):
+        self.chat = _DeepSeekChatAdapter(inner.chat)
+
+
 def run_deepseek(bundle, _model):
     api_key = os.getenv("DEEPSEEK_API_KEY")
     model_id = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
@@ -37,7 +70,8 @@ def run_deepseek(bundle, _model):
             "rows": [],
         }
 
-    client = openai.OpenAI(api_key=api_key, base_url=base_url)
+    raw_client = openai.OpenAI(api_key=api_key, base_url=base_url)
+    client = _DeepSeekClientAdapter(raw_client)
     llm = OpenAILLM(client, model_id)
 
     # AgentDojo 0.1.35's get_model_name_from_pipeline() searches the keys of
@@ -116,6 +150,7 @@ def run_deepseek(bundle, _model):
         "model": model_id,
         "attack": "tool_knowledge",
         "attack_compat_pipeline_name": attack_compat_name,
+        "transport_role_adapter": "developer-to-system",
         "tasks": len(ran),
         "benign_utility_passed": sum(row["benign_utility"] for row in ran),
         "attacked_utility_passed": sum(row["attacked_utility"] for row in ran),

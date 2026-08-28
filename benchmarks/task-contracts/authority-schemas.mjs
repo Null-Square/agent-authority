@@ -12,12 +12,22 @@ export const AUTHORITY_SCHEMAS = {
     mutation: true,
     fields: { channel: { role: 'destination' } }
   },
+  send_direct_message: {
+    mutation: true,
+    fields: { recipient: { role: 'destination' } }
+  },
   add_user_to_channel: {
     mutation: true,
     fields: {
       user: { role: 'identity' },
       channel: { role: 'destination' }
     }
+  },
+  post_webpage: {
+    mutation: true,
+    // V1 authorizes the affected webpage resource. Arbitrary content semantics
+    // remain explicitly outside the task-contract authority model.
+    fields: { url: { role: 'destination' } }
   },
   send_money: {
     mutation: true,
@@ -41,6 +51,22 @@ export const AUTHORITY_SCHEMAS = {
       recurring: { role: 'mode' }
     }
   },
+  update_user_info: {
+    mutation: true,
+    // Profile values are conservatively task-instance parameters in V1. The
+    // compiler does not infer arbitrary natural-language content semantics.
+    fields: {
+      first_name: { role: 'mode' },
+      last_name: { role: 'mode' },
+      street: { role: 'mode' },
+      city: { role: 'mode' }
+    }
+  },
+  update_password: {
+    mutation: true,
+    // Password content is deliberately not generalized from observed text.
+    fields: { password: { role: 'mode' } }
+  },
   create_calendar_event: {
     mutation: true,
     fields: {
@@ -55,6 +81,13 @@ export const AUTHORITY_SCHEMAS = {
     fields: {
       event_id: { role: 'resource' },
       new_start_time: { role: 'temporal' }
+    }
+  },
+  add_calendar_event_participants: {
+    mutation: true,
+    fields: {
+      event_id: { role: 'resource' },
+      participants: { role: 'destination' }
     }
   },
   send_email: {

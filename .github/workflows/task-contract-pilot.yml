@@ -46,6 +46,9 @@ jobs:
       - name: Run annotation-free automatic contract gate
         run: node benchmarks/task-contracts/run-automatic-contract-pilot.mjs /tmp/agentdojo-task-contract-pilot.json > /tmp/task-contract-automatic.json
 
+      - name: Run strict output-or-selection-witness gate
+        run: node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs /tmp/agentdojo-task-contract-pilot.json > /tmp/task-contract-strict.json
+
       - name: Run annotated stateful reference pilot
         run: node benchmarks/task-contracts/run-pilot.mjs > /tmp/task-contract-reference.json
 
@@ -64,5 +67,6 @@ jobs:
           path: |
             /tmp/task-contract-checkpoint.json
             /tmp/task-contract-diagnostics.json
+            /tmp/task-contract-strict.json
           if-no-files-found: error
           retention-days: 30

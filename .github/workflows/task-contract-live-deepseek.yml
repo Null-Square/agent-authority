@@ -10,6 +10,8 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      live_matrix: ${{ steps.live_matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,6 +38,7 @@ jobs:
             benchmarks/task-contracts/deepseek-publication-eval.py \
             benchmarks/task-contracts/run-deepseek-publication-eval.py \
             benchmarks/task-contracts/aggregate-deepseek-publication-eval.py \
+            benchmarks/task-contracts/aggregate-deepseek-publication-partitions.py \
             benchmarks/task-contracts/validate-mechanism-freeze.py
 
       - name: Survey AgentDojo and build frozen 60-task cohort
@@ -57,6 +60,27 @@ jobs:
             --trial 0 \
             --output /tmp/live-eval-plan.json
 
+      - name: Build 48-shard recovery matrix
+        id: live_matrix
+        run: |
+          matrix=$(python - <<'PY'
+          import json
+          partitions = {"slack": 5, "banking": 3, "workspace": 6, "travel": 2}
+          rows = []
+          for suite, count in partitions.items():
+              for trial in range(3):
+                  for partition in range(count):
+                      rows.append({
+                          "suite": suite,
+                          "trial": trial,
+                          "partition": partition,
+                          "partitions": count,
+                      })
+          print(json.dumps({"include": rows}, separators=(",", ":")))
+          PY
+          )
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
       - name: Upload frozen live inputs
         uses: actions/upload-artifact@v4
         with:
@@ -73,13 +97,11 @@ jobs:
   live:
     needs: prepare
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     strategy:
       fail-fast: false
-      max-parallel: 6
-      matrix:
-        suite: [slack, banking, workspace, travel]
-        trial: [0, 1, 2]
+      max-parallel: 8
+      matrix: ${{ fromJSON(needs.prepare.outputs.live_matrix) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -99,7 +121,7 @@ jobs:
           name: live-eval-inputs
           path: /tmp/live-inputs
 
-      - name: Run DeepSeek Pro live shard
+      - name: Run DeepSeek Pro live partition
         id: live_run
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
@@ -107,9 +129,11 @@ jobs:
           DEEPSEEK_MODEL: deepseek-v4-pro
           LIVE_SUITE: ${{ matrix.suite }}
           LIVE_TRIAL: ${{ matrix.trial }}
+          LIVE_PARTITION_INDEX: ${{ matrix.partition }}
+          LIVE_PARTITION_COUNT: ${{ matrix.partitions }}
         run: |
           set +e
-          output="/tmp/live-shard-${LIVE_SUITE}-${LIVE_TRIAL}.json"
+          output="/tmp/live-shard-${LIVE_SUITE}-${LIVE_TRIAL}-${LIVE_PARTITION_INDEX}-of-${LIVE_PARTITION_COUNT}.json"
           python benchmarks/task-contracts/run-deepseek-publication-eval.py \
             --contracts /tmp/live-inputs/task-contract-runtime-bundle.json \
             --mode run \
@@ -124,12 +148,12 @@ jobs:
           fi
           exit "$status"
 
-      - name: Upload live shard checkpoint
+      - name: Upload live partition checkpoint
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: live-shard-${{ matrix.suite }}-${{ matrix.trial }}
-          path: /tmp/live-shard-${{ matrix.suite }}-${{ matrix.trial }}.json
+          name: live-shard-${{ matrix.suite }}-${{ matrix.trial }}-${{ matrix.partition }}-of-${{ matrix.partitions }}
+          path: /tmp/live-shard-${{ matrix.suite }}-${{ matrix.trial }}-${{ matrix.partition }}-of-${{ matrix.partitions }}.json
           if-no-files-found: error
           retention-days: 30
 
@@ -150,7 +174,7 @@ jobs:
           name: live-eval-inputs
           path: /tmp/live-inputs
 
-      - name: Download all live shards
+      - name: Download all live partitions
         uses: actions/download-artifact@v4
         with:
           pattern: live-shard-*
@@ -159,7 +183,7 @@ jobs:
 
       - name: Aggregate preregistered result
         run: |
-          python benchmarks/task-contracts/aggregate-deepseek-publication-eval.py \
+          python benchmarks/task-contracts/aggregate-deepseek-publication-partitions.py \
             /tmp/live-shards/live-shard-*.json \
             --plan /tmp/live-inputs/live-eval-plan.json \
             --output /tmp/live-eval-result.json

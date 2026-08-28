@@ -94,8 +94,77 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  live:
+  calibrate:
     needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pinned AgentDojo client stack
+        run: python -m pip install -r benchmarks/agentdojo/requirements.txt
+
+      - name: Verify DeepSeek Pro transport and tool calls
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_BASE_URL: https://api.deepseek.com
+        run: |
+          if [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "DEEPSEEK_API_KEY is not configured in repository Actions secrets." >&2
+            exit 2
+          fi
+          python - <<'PY'
+          import json
+          import os
+          import openai
+
+          client = openai.OpenAI(
+              api_key=os.environ["DEEPSEEK_API_KEY"],
+              base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+              timeout=120.0,
+              max_retries=3,
+          )
+          response = client.chat.completions.create(
+              model="deepseek-v4-pro",
+              messages=[
+                  {"role": "system", "content": "You are a tool-use calibration agent."},
+                  {"role": "user", "content": "Call the ping tool once with value calibration-ok."},
+              ],
+              tools=[{
+                  "type": "function",
+                  "function": {
+                      "name": "ping",
+                      "description": "Return a calibration marker.",
+                      "parameters": {
+                          "type": "object",
+                          "properties": {"value": {"type": "string"}},
+                          "required": ["value"],
+                          "additionalProperties": False,
+                      },
+                  },
+              }],
+              tool_choice={"type": "function", "function": {"name": "ping"}},
+          )
+          calls = response.choices[0].message.tool_calls or []
+          if not calls or calls[0].function.name != "ping":
+              raise SystemExit("DeepSeek Pro did not return the required tool call")
+          args = json.loads(calls[0].function.arguments)
+          if args.get("value") != "calibration-ok":
+              raise SystemExit(f"unexpected calibration arguments: {args}")
+          print(json.dumps({
+              "status": "passed",
+              "provider": "deepseek",
+              "model": "deepseek-v4-pro",
+              "tool_call": "ping",
+          }))
+          PY
+
+  live:
+    needs: [prepare, calibrate]
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -158,8 +227,8 @@ jobs:
           retention-days: 30
 
   aggregate:
-    if: always() && needs.prepare.result == 'success'
-    needs: [prepare, live]
+    if: always() && needs.prepare.result == 'success' && needs.calibrate.result == 'success'
+    needs: [prepare, calibrate, live]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

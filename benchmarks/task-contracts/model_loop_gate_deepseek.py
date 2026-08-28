@@ -40,14 +40,13 @@ def run_deepseek(bundle, _model):
     client = openai.OpenAI(api_key=api_key, base_url=base_url)
     llm = OpenAILLM(client, model_id)
 
-    # AgentDojo 0.1.35's attack registry parses the *pipeline name* against a
-    # hard-coded set of historical model-family labels before it constructs the
-    # tool-knowledge injection. DeepSeek is not in that old whitelist. Give the
-    # attack generator its generic `Local model` compatibility label while the
-    # actual OpenAILLM object above continues to call DeepSeek/model_id. This is
-    # attack-template adapter metadata only; it does not select or replace the
-    # LLM and does not alter task-contract or authorization semantics.
-    attack_compat_name = f"Local model ({model_id})"
+    # AgentDojo 0.1.35's attack registry requires the pipeline name to exactly
+    # equal one of a hard-coded set of historical model-family labels before it
+    # constructs the tool-knowledge injection. DeepSeek is absent from that old
+    # whitelist, so expose the generic `Local model` label *only* to the attack
+    # template generator. The actual OpenAILLM object above still calls
+    # DeepSeek/model_id; task-contract and authorization semantics are unchanged.
+    attack_compat_name = "Local model"
     llm.name = attack_compat_name
     pipeline = gate.AgentPipeline.from_config(
         gate.PipelineConfig(

@@ -26,6 +26,8 @@ Frozen benchmark:
 
 Primary stochastic model: **`deepseek-v4-pro`** through DeepSeek's OpenAI-compatible chat/tool API.
 
+Primary inference mode is **thinking enabled with reasoning effort `high`**. DeepSeek V4 requires an assistant tool-call turn's `reasoning_content` to be replayed on subsequent requests. Pinned AgentDojo `0.1.35` predates that wire field and drops it, so the evaluation uses a transport-only bridge that reattaches the exact reasoning string by tool-call ID. Calibration deliberately strips `reasoning_content` between two tool turns and must prove the bridge reconstructs it before any live partition starts. The bridge does not alter prompts, tool schemas, model outputs, task state, contracts, or authorization decisions.
+
 Three independent trials are run for every planned case. `deepseek-v4-flash` is supported as a later replication but does not replace the preregistered primary run.
 
 ## Four-condition control design

@@ -40,6 +40,9 @@ jobs:
       - name: Recover lineage from authorized execution evidence
         run: node benchmarks/task-contracts/analyze-automatic-lineage.mjs /tmp/agentdojo-task-contract-pilot.json
 
+      - name: Diagnose automatic contract safety misses
+        run: node benchmarks/task-contracts/diagnose-automatic-contract.mjs /tmp/agentdojo-task-contract-pilot.json
+
       - name: Run annotation-free automatic contract gate
         run: node benchmarks/task-contracts/run-automatic-contract-pilot.mjs /tmp/agentdojo-task-contract-pilot.json
 

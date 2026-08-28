@@ -98,11 +98,9 @@ The first all-60 provider run produced 59/60 utility because the JavaScript comp
 
 **No live stochastic LLM result exists yet.**
 
-The optional AgentDojo model arm is wired through the same gated provider runtime, but GitHub Actions currently has no `OPENAI_API_KEY`. The artifact therefore records:
+The optional AgentDojo model arm is wired through the same gated provider runtime. A DeepSeek live arm is also wired through AgentDojo's OpenAI-compatible provider. A fresh live run was requested after `DEEPSEEK_API_KEY` was configured in GitHub Actions on 2026-08-28; results are pending in this checkpoint until that run completes.
 
-`status: skipped_no_openai_api_key`
-
-This checkpoint must not be cited as model-in-the-loop prompt-injection evidence. The deterministic compromised-agent and adversarial-trajectory gates are stronger than ordinary benign replay for boundary enforcement, but they do not measure how real LLM planners react to denials, injections, or alternative tool trajectories.
+This checkpoint must not be cited as model-in-the-loop prompt-injection evidence until the live run is recorded. The deterministic compromised-agent and adversarial-trajectory gates are stronger than ordinary benign replay for boundary enforcement, but they do not measure how real LLM planners react to denials, injections, or alternative tool trajectories.
 
 ## Research interpretation
 

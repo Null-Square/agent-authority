@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Run the preregistered evaluator with provider-valid adaptive adversaries.
 
-This wrapper hardens only attack construction, live-run partitioning, and the
-predeclared matrix-size assertion. It does not modify any frozen compiler or
-authorization runtime semantics.
+This wrapper hardens only attack construction, live-run partitioning, transport
+compatibility for DeepSeek thinking-mode tool turns, and the predeclared
+matrix-size assertion. It does not modify any frozen compiler or authorization
+runtime semantics.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from pathlib import Path
 
 import model_loop_gate as gate
 from agentdojo.functions_runtime import FunctionsRuntime
+from deepseek_thinking_transport import DeepSeekThinkingClientAdapter
 
 EXPECTED_PLAN = {
     "protected_tasks": 60,
@@ -46,6 +48,10 @@ def load_base():
 
 
 base = load_base()
+# The base evaluator imports the historical DeepSeek adapter for its pipeline
+# factory. Replace only that transport shim so pinned AgentDojo can preserve
+# DeepSeek V4's required reasoning_content between thinking-mode tool turns.
+base._DeepSeekClientAdapter = DeepSeekThinkingClientAdapter
 
 
 def provider_valid(suite, env, function: str, args) -> bool:

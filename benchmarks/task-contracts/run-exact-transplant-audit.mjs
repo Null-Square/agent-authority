@@ -5,7 +5,7 @@ import { directTrace } from './automatic-contracts.mjs';
 import {
   compileStrictAutomaticContract,
   evaluateStrictAutomaticContract
-} from './strict-automatic-contracts.mjs';
+} from './strict-automatic-contracts-aggregate.mjs';
 
 const path = process.argv[2];
 if (!path) throw new Error('usage: node run-exact-transplant-audit.mjs <direct-agentdojo-json>');
@@ -96,11 +96,13 @@ const result = {
   constructed: 0,
   blocked: 0,
   allowed: 0,
+  aggregateConstraints: 0,
   rows: []
 };
 
 for (const source of direct.tasks) {
   const contract = compileStrictAutomaticContract(source);
+  result.aggregateConstraints += contract.aggregateConstraints?.length || 0;
   const mutants = generateExactTransplants(source, contract, catalog);
   for (const mutant of mutants) {
     const evaluation = evaluateStrictAutomaticContract(contract, mutant.trace);
@@ -126,7 +128,8 @@ for (const source of direct.tasks) {
 result.gates = {
   enoughConstructed: result.constructed >= 20,
   allConstructedBlocked: result.constructed === result.blocked,
-  zeroAllowed: result.allowed === 0
+  zeroAllowed: result.allowed === 0,
+  aggregateSelectorPresent: result.aggregateConstraints >= 1
 };
 result.go = Object.values(result.gates).every(Boolean);
 

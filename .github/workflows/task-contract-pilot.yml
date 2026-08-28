@@ -44,7 +44,9 @@ jobs:
         run: node benchmarks/task-contracts/emit-strict-contracts.mjs /tmp/agentdojo-expanded-cohort.json /tmp/task-contract-runtime-bundle.json
 
       - name: Run strict compiler on expanded schema-covered cohort
-        run: node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs /tmp/agentdojo-expanded-cohort.json > /tmp/task-contract-strict-expanded.json
+        run: |
+          set -o pipefail
+          node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs /tmp/agentdojo-expanded-cohort.json | tee /tmp/task-contract-strict-expanded.json
 
       - name: Run compromised-agent provider-boundary gate
         run: python benchmarks/task-contracts/model_loop_gate_identity_adversary.py --contracts /tmp/task-contract-runtime-bundle.json --mode deterministic > /tmp/task-contract-provider-boundary.json

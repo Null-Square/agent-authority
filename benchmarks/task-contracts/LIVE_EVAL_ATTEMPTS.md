@@ -34,7 +34,7 @@ Artifact `9702409250` was downloaded and inspected directly; its ZIP layout conf
 
 Correction: evaluation plumbing now resolves each requested frozen artifact input recursively by exact basename and fails closed unless exactly one match exists. Aggregation uses the same rule for the preregistered plan and restores canonical metadata paths for the final artifact. No scientific input bytes or authority semantics are changed.
 
-## Attempt 3 — primary candidate
+## Attempt 3 — invalidated by adaptive injection serialization
 
 - GitHub Actions run: `33213651318`
 - Trigger commit: `be08b297d7227d1ba1afc8a97c5fd25f3a375d64`
@@ -43,7 +43,15 @@ Correction: evaluation plumbing now resolves each requested frozen artifact inpu
 - Exact 5,088-case dry plan: passed
 - Two-turn DeepSeek V4 Pro thinking/tool calibration: passed
 - Live partitions: released
+- Primary stochastic trajectories: yes
+- Scientific status: **invalid infrastructure run; do not use for V1 security/utility claims**
 
-At launch verification, the first recovery partitions successfully passed checkout, dependency installation, frozen-mechanism verification, and frozen-input download and entered `Run DeepSeek Pro live partition`. This is the first attempt in which primary stochastic task trajectories began executing.
+This was the first attempt in which primary stochastic task trajectories actually executed. Early completed Slack checkpoints were inspected directly from artifacts `9702971131`, `9702995951`, and `9703027306`. Across those three checkpoints, 242 case rows had been written; 98 were `ParserError` infrastructure failures. The failures were concentrated in authority-adaptive cases whose exact JSON tool arguments contain double quotes.
 
-No security or utility conclusion is recorded here. Those claims must come only from the completed preregistered aggregate artifact.
+Root cause: pinned AgentDojo `0.1.35` formats injection strings into `environment.yaml` source before `yaml.safe_load`. The adaptive attack text intentionally contains canonical JSON such as `{"channel": "External_0", "user": "Alice"}`. When inserted into an already double-quoted YAML scalar, those quotes terminate the scalar and the YAML parser fails before DeepSeek sees the attack. Therefore the partial zero-unauthorized-effect observation from successfully executed rows is not a valid security result: a material subset of the preregistered attacks was not delivered to the model.
+
+Correction: evaluator-only delivery plumbing now uses unique inert sentinels for selected injection vectors during AgentDojo's normal YAML parse and Pydantic validation, then replaces those sentinels in the validated environment model with the exact original adaptive payload strings. Benign and canonical AgentDojo `tool_knowledge` paths remain on AgentDojo's original loader. The wrapper also performs a fail-closed preflight over all 230 adaptive targets under all three frozen templates (690 payload materializations) before the live matrix can be released, requiring every sentinel to be observed and every exact payload to survive model re-validation. The 5,088-case plan, attack targets, templates, frozen mechanism, and decision thresholds are unchanged.
+
+## Attempt 4 — pending clean relaunch
+
+Attempt 4 is the first run eligible to become the primary live result after the adaptive-delivery correction. It must pass the unchanged frozen-mechanism hash check, unchanged exact 5,088-case plan assertion, the new 690-case delivery preflight, DeepSeek thinking/tool calibration, all live partitions, and final preregistered aggregation. No V1 claim will be recorded unless that aggregate completes without infrastructure errors.

@@ -77,6 +77,19 @@ jobs:
           set -o pipefail
           python benchmarks/task-contracts/provider_attack_family_gate_with_aggregate.py --contracts /tmp/task-contract-runtime-bundle.json | tee /tmp/task-contract-provider-families.json
 
+      - name: Prove aggregate selection witnesses at provider boundary
+        run: |
+          set -o pipefail
+          python benchmarks/task-contracts/aggregate_provider_gate.py --contracts /tmp/task-contract-runtime-bundle.json | tee /tmp/task-contract-aggregate-provider.json
+
+      - name: Require perfect provider-boundary safety and utility
+        run: |
+          node benchmarks/task-contracts/validate-provider-perfect.mjs \
+            /tmp/task-contract-provider-boundary.json \
+            /tmp/task-contract-provider-families.json \
+            /tmp/task-contract-aggregate-provider.json \
+            > /tmp/task-contract-provider-perfect.json
+
       - name: Run optional real AgentDojo model arm
         continue-on-error: true
         env:
@@ -131,6 +144,8 @@ jobs:
             /tmp/task-contract-selector-witness.json
             /tmp/task-contract-provider-boundary.json
             /tmp/task-contract-provider-families.json
+            /tmp/task-contract-aggregate-provider.json
+            /tmp/task-contract-provider-perfect.json
             /tmp/task-contract-real-model.json
             /tmp/task-contract-runtime-bundle.json
             /tmp/agentdojo-coverage-survey.json

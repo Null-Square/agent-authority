@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
-import { compileStrictAutomaticContract } from './strict-automatic-contracts.mjs';
+import { compileStrictAutomaticContract } from './strict-automatic-contracts-aggregate.mjs';
 
 const input = process.argv[2];
 const output = process.argv[3];
@@ -23,6 +23,6 @@ fs.writeFileSync(output, JSON.stringify({
   benchmark: cohort.benchmark,
   agentdojo_package: cohort.agentdojo_package,
   benchmark_version: cohort.benchmark_version,
-  mode: 'strict-contract-runtime-bundle',
+  mode: 'strict-contract-runtime-bundle+aggregate-frequency',
   contracts
 }, null, 2));

@@ -43,10 +43,28 @@ jobs:
       - name: Emit strict runtime contracts
         run: node benchmarks/task-contracts/emit-strict-contracts.mjs /tmp/agentdojo-expanded-cohort.json /tmp/task-contract-runtime-bundle.json
 
-      - name: Run strict compiler on expanded schema-covered cohort
+      - name: Run legacy strict compiler diagnostics on expanded cohort
         run: |
+          set +e
           set -o pipefail
           node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs /tmp/agentdojo-expanded-cohort.json | tee /tmp/task-contract-strict-expanded.json
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
+
+      - name: Run exact full-action-tuple transplant audit
+        run: |
+          set -o pipefail
+          node benchmarks/task-contracts/run-exact-transplant-audit.mjs /tmp/agentdojo-expanded-cohort.json | tee /tmp/task-contract-exact-transplants.json
+
+      - name: Validate corrected 60-task strict gate
+        run: |
+          node benchmarks/task-contracts/validate-expanded-strict-gate.mjs \
+            /tmp/task-contract-strict-expanded.json \
+            /tmp/task-contract-exact-transplants.json \
+            > /tmp/task-contract-strict-expanded-validated.json
 
       - name: Run compromised-agent provider-boundary gate
         run: python benchmarks/task-contracts/model_loop_gate_identity_adversary.py --contracts /tmp/task-contract-runtime-bundle.json --mode deterministic > /tmp/task-contract-provider-boundary.json
@@ -104,6 +122,8 @@ jobs:
             /tmp/task-contract-diagnostics.json
             /tmp/task-contract-strict.json
             /tmp/task-contract-strict-expanded.json
+            /tmp/task-contract-strict-expanded-validated.json
+            /tmp/task-contract-exact-transplants.json
             /tmp/task-contract-selector-witness.json
             /tmp/task-contract-provider-boundary.json
             /tmp/task-contract-provider-families.json

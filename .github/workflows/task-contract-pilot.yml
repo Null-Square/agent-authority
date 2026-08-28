@@ -47,7 +47,7 @@ jobs:
         run: node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs /tmp/agentdojo-expanded-cohort.json > /tmp/task-contract-strict-expanded.json
 
       - name: Run compromised-agent provider-boundary gate
-        run: python benchmarks/task-contracts/model_loop_gate.py --contracts /tmp/task-contract-runtime-bundle.json --mode deterministic > /tmp/task-contract-provider-boundary.json
+        run: python benchmarks/task-contracts/model_loop_gate_identity_adversary.py --contracts /tmp/task-contract-runtime-bundle.json --mode deterministic > /tmp/task-contract-provider-boundary.json
 
       - name: Run optional real AgentDojo model arm
         continue-on-error: true

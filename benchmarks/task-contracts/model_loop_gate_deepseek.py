@@ -3,11 +3,20 @@
 
 The API key is read only from DEEPSEEK_API_KEY at runtime. It is never written
 into artifacts, contracts, or logs by this harness.
+
+AgentDojo 0.1.35 predates the `openai-compatible` ModelsEnum entry that exists
+in newer AgentDojo source. To keep the benchmark pinned while avoiding a fork,
+this adapter constructs AgentDojo's own OpenAILLM pipeline element with an
+OpenAI client pointed at DeepSeek, then passes that element into PipelineConfig.
+The task-contract compiler and authorization runtime are unchanged.
 """
 
 from __future__ import annotations
 
 import os
+
+import openai
+from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM
 
 import model_loop_gate as gate
 from aggregate_runtime_support import patch_contract_gate
@@ -28,14 +37,12 @@ def run_deepseek(bundle, _model):
             "rows": [],
         }
 
-    # AgentDojo's native openai-compatible provider reads these two variables.
-    os.environ["OPENAI_COMPATIBLE_API_KEY"] = api_key
-    os.environ["OPENAI_COMPATIBLE_BASE_URL"] = base_url
-
+    client = openai.OpenAI(api_key=api_key, base_url=base_url)
+    llm = OpenAILLM(client, model_id)
     pipeline = gate.AgentPipeline.from_config(
         gate.PipelineConfig(
-            llm="openai-compatible",
-            model_id=model_id,
+            llm=llm,
+            model_id=None,
             defense=None,
             tool_delimiter="tool",
             system_message_name=None,

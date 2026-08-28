@@ -40,7 +40,7 @@ jobs:
       - name: Build unbiased schema-covered cohort
         run: node benchmarks/task-contracts/build-agentdojo-expanded-cohort.mjs /tmp/agentdojo-coverage-survey.json /tmp/agentdojo-expanded-cohort.json
 
-      - name: Emit strict runtime contracts
+      - name: Emit strict runtime contracts with aggregate witnesses
         run: node benchmarks/task-contracts/emit-strict-contracts.mjs /tmp/agentdojo-expanded-cohort.json /tmp/task-contract-runtime-bundle.json
 
       - name: Run legacy strict compiler diagnostics on expanded cohort
@@ -53,6 +53,9 @@ jobs:
           if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
             exit "$status"
           fi
+
+      - name: Run aggregate-frequency selector generalization gate
+        run: node benchmarks/task-contracts/run-aggregate-selector-pilot.mjs > /tmp/task-contract-aggregate-selector.json
 
       - name: Run exact full-action-tuple transplant audit
         run: |
@@ -67,19 +70,19 @@ jobs:
             > /tmp/task-contract-strict-expanded-validated.json
 
       - name: Run compromised-agent provider-boundary gate
-        run: python benchmarks/task-contracts/model_loop_gate_identity_adversary.py --contracts /tmp/task-contract-runtime-bundle.json --mode deterministic > /tmp/task-contract-provider-boundary.json
+        run: python benchmarks/task-contracts/model_loop_gate_identity_adversary_with_aggregate.py --contracts /tmp/task-contract-runtime-bundle.json --mode deterministic > /tmp/task-contract-provider-boundary.json
 
-      - name: Stress provider boundary with attempt-exact adversarial trajectories
+      - name: Stress provider boundary including aggregate wrong-winner attacks
         run: |
           set -o pipefail
-          python benchmarks/task-contracts/provider_attack_family_gate_v2.py --contracts /tmp/task-contract-runtime-bundle.json | tee /tmp/task-contract-provider-families.json
+          python benchmarks/task-contracts/provider_attack_family_gate_with_aggregate.py --contracts /tmp/task-contract-runtime-bundle.json | tee /tmp/task-contract-provider-families.json
 
       - name: Run optional real AgentDojo model arm
         continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           AGENTDOJO_MODEL: gpt-4o-mini-2024-07-18
-        run: python benchmarks/task-contracts/model_loop_gate.py --contracts /tmp/task-contract-runtime-bundle.json --mode real > /tmp/task-contract-real-model.json
+        run: python benchmarks/task-contracts/model_loop_gate_with_aggregate.py --contracts /tmp/task-contract-runtime-bundle.json --mode real > /tmp/task-contract-real-model.json
 
       - name: Extract and execute pilot directly from AgentDojo
         run: python benchmarks/task-contracts/extract-agentdojo-pilot.py > /tmp/agentdojo-task-contract-pilot.json
@@ -124,6 +127,7 @@ jobs:
             /tmp/task-contract-strict-expanded.json
             /tmp/task-contract-strict-expanded-validated.json
             /tmp/task-contract-exact-transplants.json
+            /tmp/task-contract-aggregate-selector.json
             /tmp/task-contract-selector-witness.json
             /tmp/task-contract-provider-boundary.json
             /tmp/task-contract-provider-families.json

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 
-import { clone, projectMutation, valueKey } from './contracts.mjs';
+import { clone, projectMutation, valueKey } from './projection.mjs';
 import {
   compileAutomaticContract,
   compileExactBaseline,
@@ -30,6 +30,14 @@ function replacementFor(value, salt = 1) {
     return Object.fromEntries(Object.entries(value).map(([key, item], index) => [key, replacementFor(item, salt + index)]));
   }
   return `variant-${salt}`;
+}
+
+function replacementForField(field, value, salt) {
+  if (field === 'deadline_token') {
+    const day = String((salt % 27) + 1).padStart(2, '0');
+    return `2099-12-${day}`;
+  }
+  return replacementFor(value, salt);
 }
 
 function replaceNumericToken(text, oldValue, newValue) {
@@ -148,7 +156,7 @@ function generateFieldMutants(source) {
   for (const { index, projected } of mutationEvents(base)) {
     for (const [field, value] of Object.entries(projected.fields)) {
       const trace = clone(base);
-      setProjectedField(trace[index], field, replacementFor(value, index + 100));
+      setProjectedField(trace[index], field, replacementForField(field, value, index + 100));
       mutants.push({ family: 'field', label: `${source.pilot_id}:${projected.action}.${field}`, trace });
     }
   }
@@ -246,6 +254,11 @@ function generateTransplants(source, contract, catalog) {
   return mutants;
 }
 
+function unresolvedDisposition(contract, item) {
+  const allowed = contract.actions[item.action]?.fields?.[item.field] || [];
+  return allowed.some((candidate) => valueKey(candidate) === valueKey(item.value)) ? 'static-fence' : 'unsafe-unbounded';
+}
+
 const catalog = buildCatalog(direct.tasks);
 const result = {
   tasks: direct.tasks.length,
@@ -254,6 +267,9 @@ const result = {
   mutants: { total: 0, autoBlocked: 0, baselineBlocked: 0, byFamily: {} },
   inferredBindings: 0,
   unresolvedDynamicCandidates: 0,
+  frozenUnresolvedCandidates: 0,
+  unsafeUnresolvedCandidates: 0,
+  selectorBindings: 0,
   taskResults: []
 };
 
@@ -267,7 +283,13 @@ for (const source of direct.tasks) {
   result.base.autoAccepted += Number(baseAuto);
   result.base.baselineAccepted += Number(baseBaseline);
   result.inferredBindings += contract.metadata.bindings.length;
+  result.selectorBindings += contract.metadata.bindings.filter((binding) => binding.match.startsWith('selector-')).length;
   result.unresolvedDynamicCandidates += contract.metadata.unresolved.length;
+  for (const item of contract.metadata.unresolved) {
+    const disposition = unresolvedDisposition(contract, item);
+    result.frozenUnresolvedCandidates += Number(disposition === 'static-fence');
+    result.unsafeUnresolvedCandidates += Number(disposition === 'unsafe-unbounded');
+  }
 
   const seenVariants = new Set();
   const variants = [];
@@ -315,6 +337,7 @@ for (const source of direct.tasks) {
   result.taskResults.push({
     id: source.pilot_id,
     bindings: contract.metadata.bindings.length,
+    selectorBindings: contract.metadata.bindings.filter((binding) => binding.match.startsWith('selector-')).length,
     unresolved: contract.metadata.unresolved.length,
     variants: variants.length,
     mutants: mutants.length,
@@ -337,7 +360,7 @@ result.gates = {
   counterfactualUtility: result.summary.counterfactualAutoAcceptancePct >= 90,
   generalizationGap: result.summary.counterfactualAutoAcceptancePct > result.summary.counterfactualBaselineAcceptancePct,
   mutantSafety: result.summary.autoMutantBlockPct >= 95,
-  unresolvedBounded: result.unresolvedDynamicCandidates <= 3
+  unresolvedFailClosed: result.unsafeUnresolvedCandidates === 0
 };
 result.go = Object.values(result.gates).every(Boolean);
 

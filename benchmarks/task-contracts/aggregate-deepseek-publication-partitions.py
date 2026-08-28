@@ -7,6 +7,7 @@ import argparse
 import importlib.util
 import json
 import re
+import shutil
 from collections import Counter
 from pathlib import Path
 
@@ -39,6 +40,35 @@ def expected_shards():
     }
 
 
+def resolve_artifact_input(requested: Path) -> Path:
+    if requested.is_file():
+        return requested
+    root = requested.parent
+    if not root.exists():
+        raise FileNotFoundError(f"artifact input root does not exist: {root}")
+    matches = sorted(path for path in root.rglob(requested.name) if path.is_file())
+    if len(matches) != 1:
+        raise FileNotFoundError(
+            f"expected exactly one artifact input named {requested.name} under {root}; found {matches}"
+        )
+    return matches[0]
+
+
+def canonicalize_downloaded_metadata(root: Path, names: tuple[str, ...]) -> None:
+    """Copy uniquely resolved metadata to the workflow's canonical upload paths."""
+
+    root.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        target = root / name
+        if target.is_file():
+            continue
+        matches = sorted(path for path in root.rglob(name) if path.is_file())
+        if len(matches) == 1:
+            shutil.copy2(matches[0], target)
+        elif len(matches) > 1:
+            raise FileNotFoundError(f"ambiguous artifact metadata {name}: {matches}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("shards", nargs="+")
@@ -46,9 +76,18 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
-    plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
+    requested_plan = Path(args.plan)
+    plan_path = resolve_artifact_input(requested_plan)
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
     if plan.get("protocol") != PROTOCOL or plan.get("protected_tasks") != 60:
         raise SystemExit("live plan does not match frozen protocol/60-task cohort")
+
+    # Restore the canonical paths expected by the final artifact upload without
+    # changing any bytes in the scientific inputs.
+    canonicalize_downloaded_metadata(
+        requested_plan.parent,
+        ("live-eval-plan.json", "live-eval-freeze-validation.json"),
+    )
 
     observed_keys = set()
     shards = []

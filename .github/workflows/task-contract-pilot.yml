@@ -8,6 +8,7 @@ on:
       - "benchmarks/task-contracts/**"
       - "benchmarks/agentdojo/requirements.txt"
       - ".github/workflows/task-contract-pilot.yml"
+      - ".github/workflows/task-contract-live-deepseek.yml"
   workflow_dispatch:
 
 permissions:
@@ -31,6 +32,20 @@ jobs:
       - name: Install AgentDojo research dependency
         run: python -m pip install -r benchmarks/agentdojo/requirements.txt
 
+      - name: Verify frozen V1 live-evaluation mechanism
+        run: |
+          python benchmarks/task-contracts/validate-mechanism-freeze.py \
+            benchmarks/task-contracts/live-eval-freeze.json \
+            > /tmp/live-eval-freeze-validation.json
+
+      - name: Compile live-evaluation tooling
+        run: |
+          python -m py_compile \
+            benchmarks/task-contracts/deepseek-publication-eval.py \
+            benchmarks/task-contracts/run-deepseek-publication-eval.py \
+            benchmarks/task-contracts/aggregate-deepseek-publication-eval.py \
+            benchmarks/task-contracts/validate-mechanism-freeze.py
+
       - name: Audit prompt/trace oracle consistency
         run: python benchmarks/task-contracts/audit-agentdojo-oracle-consistency.py > /tmp/agentdojo-oracle-consistency.json
 
@@ -45,6 +60,15 @@ jobs:
 
       - name: Emit strict runtime contracts with aggregate witnesses
         run: node benchmarks/task-contracts/emit-strict-contracts.mjs /tmp/agentdojo-expanded-cohort.json /tmp/task-contract-runtime-bundle.json
+
+      - name: Materialize publication live-evaluation plan without API calls
+        run: |
+          python benchmarks/task-contracts/run-deepseek-publication-eval.py \
+            --contracts /tmp/task-contract-runtime-bundle.json \
+            --mode plan \
+            --suite all \
+            --trial 0 \
+            --output /tmp/live-eval-plan.json
 
       - name: Run legacy strict compiler diagnostics on expanded cohort
         run: |
@@ -92,23 +116,6 @@ jobs:
             /tmp/task-contract-provider-families.json \
             /tmp/task-contract-aggregate-provider.json \
             > /tmp/task-contract-provider-perfect.json
-
-      - name: Run optional DeepSeek AgentDojo model arm
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          DEEPSEEK_BASE_URL: https://api.deepseek.com
-          DEEPSEEK_MODEL: deepseek-v4-flash
-        run: python benchmarks/task-contracts/model_loop_gate_deepseek.py --contracts /tmp/task-contract-runtime-bundle.json --mode real > /tmp/task-contract-deepseek-model.json
-
-      - name: Validate live DeepSeek result when configured
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        run: |
-          if [ -z "$DEEPSEEK_API_KEY" ]; then
-            echo "DeepSeek secret not configured; live arm remains optional."
-            exit 0
-          fi
-          node benchmarks/task-contracts/validate-deepseek-live.mjs /tmp/task-contract-deepseek-model.json > /tmp/task-contract-deepseek-validated.json
 
       - name: Run optional OpenAI AgentDojo model arm
         continue-on-error: true
@@ -166,10 +173,10 @@ jobs:
             /tmp/task-contract-provider-families.json
             /tmp/task-contract-aggregate-provider.json
             /tmp/task-contract-provider-perfect.json
-            /tmp/task-contract-deepseek-model.json
-            /tmp/task-contract-deepseek-validated.json
             /tmp/task-contract-real-model.json
             /tmp/task-contract-runtime-bundle.json
+            /tmp/live-eval-freeze-validation.json
+            /tmp/live-eval-plan.json
             /tmp/agentdojo-oracle-consistency.json
             /tmp/agentdojo-coverage-survey.json
             /tmp/agentdojo-coverage-summary.json

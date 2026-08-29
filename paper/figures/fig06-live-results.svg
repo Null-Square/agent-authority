@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 780" role="img" aria-labelledby="title desc">
+  <title id="title">Partial live DeepSeek V4 Pro matched result</title>
+  <desc id="desc">For 372 matched attacked Slack scenarios, ungated execution produced 61 unauthorized protected effects across 40 scenarios, gated execution produced zero, and utility was 84.41 percent ungated versus 82.26 percent gated. The preregistered 5088-run matrix was incomplete.</desc>
+  <rect width="820" height="780" fill="#fff"/>
+  <text x="42" y="44" font-family="Inter,Arial,sans-serif" font-size="23" font-weight="700">Partial live matched result</text>
+  <text x="42" y="72" font-family="Inter,Arial,sans-serif" font-size="15" fill="#5f6368">DeepSeek V4 Pro · 372 attacked scenarios completed in both conditions</text>
+
+  <rect x="42" y="100" width="736" height="58" fill="#f7f7f5" stroke="#8f9297" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="64" y="124" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700">SCOPE</text>
+  <text x="64" y="146" font-family="Inter,Arial,sans-serif" font-size="13" fill="#5f6368">Slack-only completed slice. The preregistered 5,088-run four-suite matrix did not complete.</text>
+
+  <!-- legend labels direct -->
+  <rect x="485" y="182" width="16" height="16" fill="#0a0a0a"/>
+  <text x="510" y="195" font-family="Inter,Arial,sans-serif" font-size="13" fill="#0a0a0a">Ungated</text>
+  <rect x="610" y="182" width="16" height="16" fill="#f5d13a" stroke="#0a0a0a"/>
+  <text x="635" y="195" font-family="Inter,Arial,sans-serif" font-size="13" fill="#0a0a0a">Gated</text>
+
+  <!-- effects -->
+  <text x="42" y="240" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">Unauthorized protected effects</text>
+  <line x1="300" y1="255" x2="744" y2="255" stroke="#d9dadd"/>
+  <rect x="300" y="274" width="372" height="30" fill="#0a0a0a"/>
+  <text x="684" y="295" font-family="ui-monospace,monospace" font-size="15" font-weight="700">61</text>
+  <rect x="300" y="316" width="3" height="30" fill="#f5d13a" stroke="#0a0a0a"/>
+  <text x="316" y="337" font-family="ui-monospace,monospace" font-size="15" font-weight="700">0</text>
+
+  <!-- scenarios -->
+  <text x="42" y="396" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">Scenarios with ≥1 unauthorized effect</text>
+  <line x1="300" y1="411" x2="744" y2="411" stroke="#d9dadd"/>
+  <rect x="300" y="430" width="244" height="30" fill="#0a0a0a"/>
+  <text x="556" y="451" font-family="ui-monospace,monospace" font-size="15" font-weight="700">40 / 372</text>
+  <rect x="300" y="472" width="3" height="30" fill="#f5d13a" stroke="#0a0a0a"/>
+  <text x="316" y="493" font-family="ui-monospace,monospace" font-size="15" font-weight="700">0 / 372</text>
+  <text x="300" y="526" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">Ungated scenario rate: 10.75%; gated: 0%.</text>
+
+  <!-- utility -->
+  <text x="42" y="582" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">Matched task utility</text>
+  <line x1="300" y1="597" x2="744" y2="597" stroke="#d9dadd"/>
+  <rect x="300" y="616" width="374.5" height="30" fill="#0a0a0a"/>
+  <text x="686" y="637" font-family="ui-monospace,monospace" font-size="15" font-weight="700">84.41%</text>
+  <rect x="300" y="658" width="365.2" height="30" fill="#f5d13a" stroke="#0a0a0a"/>
+  <text x="677" y="679" font-family="ui-monospace,monospace" font-size="15" font-weight="700">82.26%</text>
+  <text x="300" y="713" font-family="Inter,Arial,sans-serif" font-size="13" fill="#5f6368">Matched utility difference: −2.15 percentage points with enforcement.</text>
+
+  <line x1="42" y1="738" x2="778" y2="738" stroke="#d9dadd"/>
+  <text x="42" y="765" font-family="Inter,Arial,sans-serif" font-size="12.5" fill="#8a8d91">Interpretation: provider-effect containment in the completed matched slice; not a broad prompt-injection-security or four-suite V4 Pro claim.</text>
+</svg>

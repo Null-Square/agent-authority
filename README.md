@@ -105,19 +105,18 @@ Attempt 3 remains supplementary evidence. Its adaptive arm failed before model e
 
 See [RESEARCH.md](RESEARCH.md), [the paper-facing result summary](benchmarks/task-contracts/PAPER_RESULTS_DRAFT.md), and [the attempt log](benchmarks/task-contracts/LIVE_EVAL_ATTEMPTS.md).
 
-## Research artifact preservation
+## Research evidence preservation
 
-The exact aggregate GitHub Actions artifacts for paid Attempts 3 and 4 are committed under:
+The repository stores permanent machine-readable summaries for Attempts 3 and 4:
 
 ```text
-benchmarks/task-contracts/artifacts/
+benchmarks/task-contracts/artifacts/attempt-3-summary.json
+benchmarks/task-contracts/artifacts/attempt-4-summary.json
 ```
 
-They include the aggregate result, frozen inputs, and all 48 shard JSON files for each attempt. Their committed ZIP bytes match the original GitHub Actions SHA-256 digests.
+The [artifact manifest](benchmarks/task-contracts/ARTIFACT_MANIFEST.md) records each original GitHub Actions run ID, artifact ID, head SHA, exact SHA-256 digest, archive layout, and interpretation rule. This preserves the identity of the paid evidence even after Actions retention expires.
 
-This keeps the partial paid evidence available after the temporary Actions artifacts expire.
-
-See [ARTIFACT_MANIFEST.md](benchmarks/task-contracts/ARTIFACT_MANIFEST.md).
+The original raw ZIPs contained the aggregate result, frozen inputs, and all 48 shard JSON files for each attempt. The repository does **not** claim that those binary ZIP bytes are stored in Git history.
 
 ## What the research does and does not establish
 

@@ -1,5 +1,5 @@
-Selection witnesses separate observed resource candidates from task-selected authority.
-Task-local resource authority can grow while the Mission keeps a fixed effect ceiling.
-The frozen mechanism blocked 370/370 corrected mutants and 230/230 provider attacks.
-In 372 matched live attacked scenarios, unauthorized protected effects fell from 61 to 0.
-An exact-trace baseline accepted only 1/36 legitimate evidence-consistent counterfactuals.
+Selection witnesses separate observed candidates from task-selected authority.
+Task resource authority can grow under a fixed Mission effect ceiling.
+The frozen mechanism blocked 370/370 mutants and 230/230 provider attacks.
+Matched live attacks produced 61 unauthorized effects ungated and 0 gated.
+Exact-trace policies accepted only 1/36 legitimate counterfactuals.

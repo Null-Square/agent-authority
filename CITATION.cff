@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use Agent Authority or its V1 research artifacts, cite this repository and the exact commit used."
+title: "Agent Authority"
+type: software
+authors:
+  - name: "NullSquare"
+version: "0.5.0"
+date-released: "2026-08-25"
+url: "https://github.com/Null-Square/agent-authority"
+repository-code: "https://github.com/Null-Square/agent-authority"
+license: "Apache-2.0"
+keywords:
+  - "AI agent authorization"
+  - "task-bounded authority"
+  - "least privilege"
+  - "selection witnesses"
+  - "agent security"
+  - "AgentDojo"
+abstract: >-
+  Agent Authority is a task-bounded execution layer for AI agents. The V1 research
+  package studies evidence-grounded dynamic resource authority and deterministic
+  selection witnesses under a fixed effect ceiling, with deterministic,
+  provider-boundary, and partial live-model evaluation artifacts.

@@ -59,7 +59,9 @@
   "devDependencies": {
     "ai": "^7.0.73"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
@@ -89,8 +91,25 @@
     "./providers/github-coding": "./src/providers/github-coding.js",
     "./providers/google": "./src/providers/google.js"
   },
-  "files": ["src", "docs", "examples", "benchmarks", "README.md", "LICENSE", "SECURITY.md", "ROADMAP.md", "CONTRIBUTING.md"],
-  "repository": { "type": "git", "url": "git+https://github.com/Null-Square/agent-authority.git" },
-  "bugs": { "url": "https://github.com/Null-Square/agent-authority/issues" },
+  "files": [
+    "src",
+    "docs",
+    "examples",
+    "benchmarks",
+    "README.md",
+    "RESEARCH.md",
+    "CITATION.cff",
+    "LICENSE",
+    "SECURITY.md",
+    "ROADMAP.md",
+    "CONTRIBUTING.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Null-Square/agent-authority.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Null-Square/agent-authority/issues"
+  },
   "homepage": "https://github.com/Null-Square/agent-authority#readme"
 }

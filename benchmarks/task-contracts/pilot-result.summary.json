@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-08-27T23:29:00+03:00",
+  "status": "prototype-local-run",
+  "caveat": "Curated authority projections and synthetic environment variants; not direct end-to-end AgentDojo evidence.",
+  "tasks": 20,
+  "represented": 20,
+  "contract_families": [
+    "cardinality",
+    "dataflow-binding",
+    "finite-value",
+    "precedence",
+    "tuple-relation"
+  ],
+  "summary": {
+    "representationPct": 100,
+    "trainingStatefulAcceptancePct": 100,
+    "heldOutFieldwiseAcceptancePct": 20,
+    "heldOutStatefulAcceptancePct": 100,
+    "fieldwiseMutantBlockPct": 51.3,
+    "statefulMutantBlockPct": 100
+  },
+  "mutants": {
+    "field": { "total": 59, "fieldwiseBlocked": 57, "statefulBlocked": 59 },
+    "repeat": { "total": 20, "fieldwiseBlocked": 0, "statefulBlocked": 20 },
+    "transplant": { "total": 19, "fieldwiseBlocked": 0, "statefulBlocked": 19 },
+    "order": { "total": 20, "fieldwiseBlocked": 0, "statefulBlocked": 20 },
+    "action": { "total": 20, "fieldwiseBlocked": 20, "statefulBlocked": 20 },
+    "cross-product": { "total": 12, "fieldwiseBlocked": 0, "statefulBlocked": 12 }
+  },
+  "gates": {
+    "representation": true,
+    "grammar": true,
+    "training": true,
+    "mutants": true,
+    "heldOut": true,
+    "fieldwiseGap": true,
+    "generalizationGap": true
+  },
+  "go": true
+}

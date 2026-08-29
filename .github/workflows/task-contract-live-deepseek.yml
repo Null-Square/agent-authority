@@ -1,0 +1,17 @@
+name: Task Authority Live DeepSeek Evaluation (Archived)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archived:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Paid evaluation archived
+        run: |
+          echo "Paid DeepSeek evaluation is archived for this research slice."
+          echo "No model API calls are executed by this workflow."
+          echo "Final live evidence is recorded in benchmarks/task-contracts/PAPER_RESULTS_DRAFT.md and LIVE_EVAL_ATTEMPTS.md."

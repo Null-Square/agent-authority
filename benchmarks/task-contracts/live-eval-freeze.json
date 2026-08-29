@@ -1,0 +1,22 @@
+{
+  "protocol": "live-eval-v1",
+  "frozen_at_commit": "e0f41aeba9a876c526572527afe8e962c4e7a19c",
+  "benchmark": "AgentDojo",
+  "agentdojo_package": "0.1.35",
+  "benchmark_version": "v1.2.2",
+  "expected_protected_tasks": 60,
+  "primary_model": "deepseek-v4-pro",
+  "trials": 3,
+  "frozen_blobs": {
+    "benchmarks/agentdojo/requirements.txt": "c078f90c1bba1184ff4bc9712ec914aaea5f47bc",
+    "benchmarks/task-contracts/authority-schemas.mjs": "17690cf57c863672977c7ae2b500828a59ee285d",
+    "benchmarks/task-contracts/automatic-contracts.mjs": "34e222c6dec676e9c614e3e78c48117c6dd5bc4c",
+    "benchmarks/task-contracts/projection.mjs": "ff92276f941c63401285d95d8161423a695c386b",
+    "benchmarks/task-contracts/strict-automatic-contracts.mjs": "57db8e3a5528d10dacd8b150b1cf038ff9042118",
+    "benchmarks/task-contracts/strict-automatic-contracts-aggregate.mjs": "36560be47647a0ef4d1efa51ddfa8ff2d1272652",
+    "benchmarks/task-contracts/emit-strict-contracts.mjs": "b0fc10c18c91e67602cd544520d93e250bd3d6b9",
+    "benchmarks/task-contracts/model_loop_gate.py": "4a22df192ca42988681c416f0b9545bdda8ac801",
+    "benchmarks/task-contracts/aggregate_runtime_support.py": "5876d508a1b94071a1f2438f4b606f75e4318f58",
+    "benchmarks/task-contracts/model_loop_gate_with_aggregate.py": "e07e85d51a5335492503d9aae8689cbe9f213405"
+  }
+}

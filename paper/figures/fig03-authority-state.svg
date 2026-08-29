@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 680" role="img" aria-labelledby="title desc">
+  <title id="title">Task-local authority state transition</title>
+  <desc id="desc">Task-local resource authority grows from authorized evidence and selection witnesses while the Mission effect ceiling stays fixed.</desc>
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#0a0a0a"/></marker></defs>
+  <rect width="760" height="680" fill="#fff"/>
+  <text x="40" y="42" font-family="Inter,Arial,sans-serif" font-size="23" font-weight="700" fill="#0a0a0a">Authority state transition</text>
+
+  <rect x="80" y="72" width="600" height="64" fill="#f5d13a" stroke="#0a0a0a" stroke-width="2"/>
+  <text x="380" y="99" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700">Mission M — fixed effect ceiling</text>
+  <text x="380" y="122" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13">Effects(A<tspan baseline-shift="sub" font-size="10">t</tspan>) ⊆ M at every reachable state</text>
+
+  <rect x="80" y="174" width="250" height="105" fill="#f7f7f5" stroke="#0a0a0a" stroke-width="1.5"/>
+  <text x="103" y="204" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700">Current authority A<tspan baseline-shift="sub" font-size="11">t</tspan></text>
+  <text x="103" y="232" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">trusted roots</text>
+  <text x="103" y="254" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">prior verified facts</text>
+
+  <rect x="430" y="174" width="250" height="105" fill="#fff" stroke="#0a0a0a" stroke-width="1.5"/>
+  <text x="453" y="204" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700">Requested effect e<tspan baseline-shift="sub" font-size="11">t</tspan></text>
+  <text x="453" y="232" font-family="ui-monospace,monospace" font-size="13" fill="#5f6368">operation + arguments</text>
+  <text x="453" y="254" font-family="ui-monospace,monospace" font-size="13" fill="#5f6368">checked before side effect</text>
+
+  <path d="M330 226 L428 226" stroke="#0a0a0a" stroke-width="2" marker-end="url(#a)"/>
+  <text x="379" y="212" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="#5f6368">satisfy bindings?</text>
+
+  <path d="M555 279 L555 332" stroke="#0a0a0a" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="430" y="338" width="250" height="94" fill="#fff" stroke="#0a0a0a" stroke-width="1.5"/>
+  <text x="453" y="368" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700">Authorized output o<tspan baseline-shift="sub" font-size="11">t</tspan></text>
+  <text x="453" y="396" font-family="ui-monospace,monospace" font-size="13" fill="#5f6368">bound by execution evidence σ<tspan baseline-shift="sub" font-size="9">t</tspan></text>
+  <text x="453" y="417" font-family="ui-monospace,monospace" font-size="13" fill="#5f6368">to the exact guarded action</text>
+
+  <rect x="80" y="338" width="250" height="94" fill="#fff" stroke="#0a0a0a" stroke-width="1.5"/>
+  <text x="103" y="368" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700">Selection witness</text>
+  <text x="103" y="396" font-family="ui-monospace,monospace" font-size="13" fill="#5f6368">S(P, C, E) → unique r</text>
+  <text x="103" y="417" font-family="ui-monospace,monospace" font-size="13" fill="#5f6368">tie / incomplete → ∅</text>
+
+  <path d="M430 385 L332 385" stroke="#0a0a0a" stroke-width="2" marker-end="url(#a)"/>
+  <text x="381" y="372" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="#5f6368">derive candidates</text>
+
+  <rect x="80" y="486" width="600" height="112" fill="#f7f7f5" stroke="#0a0a0a" stroke-width="2"/>
+  <rect x="80" y="486" width="11" height="112" fill="#f5d13a"/>
+  <text x="112" y="520" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700">Next authority A<tspan baseline-shift="sub" font-size="11">t+1</tspan></text>
+  <text x="112" y="551" font-family="ui-monospace,monospace" font-size="13">A<tspan baseline-shift="sub" font-size="9">t+1</tspan> = A<tspan baseline-shift="sub" font-size="9">t</tspan> ∪ derive(o<tspan baseline-shift="sub" font-size="9">t</tspan>, σ<tspan baseline-shift="sub" font-size="9">t</tspan>) ∪ select(S(P,C,E))</text>
+  <text x="112" y="580" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">New concrete resource facts are permitted; new effect kinds are not.</text>
+
+  <path d="M205 432 L205 484" stroke="#0a0a0a" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M555 432 L555 484" stroke="#0a0a0a" stroke-width="2" marker-end="url(#a)"/>
+
+  <line x1="40" y1="632" x2="720" y2="632" stroke="#d9dadd"/>
+  <text x="40" y="658" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">No request self-authorization: a prior agent-supplied argument cannot become authority solely because it appeared in request history.</text>
+</svg>

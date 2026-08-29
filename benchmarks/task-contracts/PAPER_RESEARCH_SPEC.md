@@ -1,8 +1,10 @@
-# Paper research specification — selection witnesses for open-world agent authorization
+# Paper Research Specification — Selection Witnesses for Open-World Agent Authorization
 
-Status: **research plan, not a submission draft**
+Status: **V1 research specification closed; paper source, not submission manuscript**
 
-Branch: `research/task-contract-pilot`
+Closed: **2026-08-29**
+
+Branch at closure: `research/task-contract-pilot`
 
 ## Working title
 
@@ -14,13 +16,15 @@ Short alternative:
 
 ## Thesis
 
-Agent tasks frequently refer to resources that are not known when authorization begins. A secure agent therefore needs a way to acquire authority for newly discovered resources without receiving broad standing permission and without treating every discovered candidate as authorized.
+Agent tasks often need resources that are not known when authorization starts. A secure agent therefore needs a way to acquire task-local resource authority during execution without receiving ambient account authority and without treating every discovered candidate as authorized.
 
-The paper will test the thesis that dynamic task authority can be made both useful and bounded when new authority is acquired from **authorized execution evidence plus deterministic selection witnesses**, while the set of permitted effect types remains inside a fixed Mission ceiling.
+V1 tests this thesis:
 
-## What is not the novelty claim
+> Dynamic task authority can remain useful and bounded when new resource authority descends from authorized execution evidence plus deterministic selection witnesses, while the set of permitted effect types remains inside a fixed Mission ceiling.
 
-The paper must **not** claim novelty for any of these ideas by themselves:
+## Novelty boundary
+
+Do **not** claim novelty for any of these ideas by themselves:
 
 - task-based authorization;
 - least privilege;
@@ -32,172 +36,173 @@ The paper must **not** claim novelty for any of these ideas by themselves:
 - prompt-injection defense;
 - delegation that can only narrow authority.
 
-All have substantial prior work.
-
-## Candidate contribution claim
-
-The narrow candidate contribution is the combination of these points:
+The candidate contribution is the combination of:
 
 1. **Open-world resource authority.** A task can begin without enumerating every concrete resource identifier it will need.
 2. **Evidence-grounded acquisition.** New resource authority can arise only from an authorized causal execution path, not from arbitrary model output or prior request arguments.
-3. **Candidate/selection separation.** Discovering a set of candidate resources does not authorize each candidate.
-4. **Selection witnesses.** When several candidates exist, a later effect receives dynamic authority only when a deterministic witness proves that the selected value satisfies the task selector over evidenced candidates/measurements.
-5. **Fixed effect ceiling.** Resource authority may grow during a task, but the kinds of effects that can be executed remain bounded by the Mission ceiling.
-6. **Fail-closed ambiguity.** Ties, incomplete measurements, unsupported predicates, or unresolved semantics do not create generalized dynamic authority.
+3. **Candidate/selection separation.** Discovering candidate resources does not authorize every candidate.
+4. **Selection witnesses.** A later effect receives dynamic authority only when a deterministic witness proves that the selected value satisfies the task selector over evidenced candidates and measurements.
+5. **Fixed effect ceiling.** Concrete resource facts can grow during a task while permitted effect types remain bounded by the Mission.
+6. **Fail-closed ambiguity.** Ties, incomplete measurements, unsupported predicates, and unresolved semantics do not create generalized dynamic authority.
 
-This is a hypothesis to defend against prior work, not a priority claim.
+This is a contribution hypothesis to defend against current related work. It is not a priority claim.
 
-## Core motivating failure
+## Core falsification
 
 A provenance-only rule can be circular:
 
 ```text
-agent chooses resource X
-        ↓
-agent performs an allowed read of X
-        ↓
-X appears in the authorized execution history
-        ↓
-naive provenance system treats X as authorized
-        ↓
-agent performs a privileged effect on X
+agent chooses X
+      |
+      v
+allowed read of X
+      |
+      v
+X appears in authorized history
+      |
+      v
+naive provenance treats X as authorized
+      |
+      v
+privileged effect on X
 ```
 
-This proves only that the agent used `X`, not that the user task selected `X`.
+This proves only that the agent used `X`. It does not prove that the user's task selected `X`.
 
-A second failure occurs when a read returns multiple candidate resources:
+A second failure occurs when an authorized read returns several candidates:
 
 ```text
 authorized read -> [A, B, C]
 ```
 
-Membership proves that `A`, `B`, and `C` were discovered. It does not prove which one is authorized for a later mutation.
+Membership proves discovery. It does not prove which candidate the task authorizes for a later mutation.
 
-The research mechanism introduces a separate selection step:
+V1 therefore introduces a separate selection step:
 
 ```text
 task predicate P
 candidate set C
 measurements/evidence E
-        ↓
-selection witness S(P, C, E)
-        ↓
+        |
+        v
+selection witness S(P,C,E)
+        |
+        v
 unique selected resource r
-        ↓
+        |
+        v
 dynamic authority for r
 ```
 
-## Research questions
+The expanded AgentDojo cohort produced a concrete falsification in Slack task 13. Alice appeared in authorized histories, but Charlie was the aggregate message-count winner. Observation provenance alone would permit the wrong candidate. The aggregate-frequency witness repaired the general rule without a task-ID-specific authorization exception.
 
-### RQ1 — Automatic authority recovery
+## Research questions and V1 status
 
-How much authority lineage can be recovered from direct authorized execution evidence using provider/action-level schemas and no task-ID-specific rules?
+### RQ1 — Authority recovery
 
-Current pilot signal:
+How much useful authority structure can be recovered from authorized execution evidence using provider/action schemas without task-ID-specific authorization rules?
 
-- 20 direct AgentDojo tasks;
-- 90.5% gold lineage recall;
-- 95% recall over eligible gold bindings;
-- 0 task-specific inference rules in the automatic analyzer.
+**V1 status:** feasible. Earlier direct-pilot lineage recovery reached 90.5% gold recall and 95% eligible recall with zero task-specific inference rules. The final 60-task cohort uses provider/action-level schemas and no task-ID-specific authorization rules in the evaluated mechanism.
 
 ### RQ2 — Utility versus authorization safety
 
-Can an annotation-free stateful contract preserve legitimate counterfactual executions while blocking near-neighbor authorization mutations better than field-wise/static alternatives?
+Can a stateful task contract preserve legitimate changed executions while blocking near-neighbor authorization mutations better than exact-trace/static alternatives?
 
-Current strict pilot signal:
+**V1 status:** strongly supported in the evaluated deterministic cohort.
 
-- base utility: 20/20;
-- evidence-consistent variants: 11/11;
-- field-wise baseline variants: 1/11;
-- strict mutants blocked: 141/141;
-- field-wise baseline mutants blocked: 88/141.
+- reference utility: **60/60**;
+- evidence-consistent counterfactuals: **36/36** accepted;
+- static exact-trace baseline: **1/36** accepted;
+- corrected adversarial mutants: **370/370** blocked;
+- constructible provider-boundary adversarial trajectories: **230/230** blocked;
+- malicious provider reaches: **0**.
 
-These numbers are pilot evidence and must not be treated as final paper statistics.
+### RQ3 — Selection-witness generalization
 
-### RQ3 — Selection-witness soundness and generalization
+When evidence changes so a different candidate becomes the correct unique winner, can the same selector relation authorize the new winner and reject stale or wrong winners?
 
-When evidence changes so a different candidate becomes the correct unique winner, can the same compiled contract authorize the new winner while rejecting stale/wrong winners?
+**V1 status:** supported for the implemented selector families under controlled evidence.
 
-Current controlled pilot signal:
-
-- prefix: changed winner accepted, wrong winner rejected;
-- unique argmax: changed winner accepted, stale winner rejected;
-- unique argmin: changed winner accepted, wrong winner rejected;
-- tie: no generalized selector authority;
-- incomplete measurement: no generalized selector authority;
-- request-only circular provenance: no generalized authority.
+The prototype exercises prefix, extremum, and aggregate-frequency selection. Ties and insufficient evidence fail closed. The result is mechanism-level evidence, not a claim of arbitrary semantic predicate support.
 
 ### RQ4 — Adversarial model robustness
 
-Under a compromised or prompt-injected agent model, how often can the model cause an unauthorized effect to reach the provider boundary?
+Under adversarial model trajectories, can policy-unauthorized protected effects reach the provider boundary?
 
-This is **not yet answered** by the current ground-truth-trace pilot.
+**V1 status:** partially answered by DeepSeek V4 Pro live evidence.
+
+In the 372 attacked scenarios that completed in both ungated and gated conditions:
+
+- ungated execution produced **61 policy-unauthorized protected effects across 40 scenarios**;
+- gated execution produced **0**;
+- ungated matched utility was **84.41%**;
+- gated matched utility was **82.26%**.
+
+This is a partial Slack live slice. The full preregistered 5,088-run matrix did not complete. Do not generalize this result to broad prompt-injection security or multi-model robustness.
 
 ### RQ5 — Cost of bounded authority
 
-What utility, latency, policy-generation, and user step-up costs are introduced by evidence-grounded dynamic authority compared with broader task authorization and static policies?
+What utility, latency, policy-generation, and user step-up costs does bounded authority introduce?
 
-This is **not yet measured**.
+**V1 status:** partially measured.
+
+The matched attacked DeepSeek slice shows a **2.15 percentage-point utility difference** between ungated and gated conditions. Deterministic reference utility is 60/60. V1 does not provide a complete latency, policy-generation, false-step-up, or human-approval cost study.
 
 ## Formal objects
 
-A minimal formal model should include:
+Use at minimum:
 
 - `M`: Mission authority / effect ceiling;
 - `A_t`: task-local resource authority facts at step `t`;
 - `H_t`: authorized execution history through step `t`;
 - `e_t`: requested effect;
-- `q_t`: effect arguments / requested resources;
+- `q_t`: effect arguments/resources;
 - `o_t`: provider output;
 - `sigma_t`: execution evidence binding request, output, effect, lease, and time;
-- `C`: candidate resource set produced by authorized evidence;
+- `C`: candidate resource set derived from authorized evidence;
 - `P`: task selection predicate;
 - `E`: measurements/evidence over candidates;
-- `S(P,C,E)`: selection witness;
+- `S(P,C,E)`: deterministic selection witness;
 - `r`: selected resource;
 - `F`: statically fenced unresolved values.
 
-The model must distinguish **effect authority** from **resource authority**.
+The paper must distinguish **effect authority** from **resource authority**.
 
-Resource authority can increase inside a task:
+Task-local resource facts can grow:
 
 ```text
 A_t subseteq A_(t+1)
 ```
 
-while effect authority remains bounded:
+while effect types remain bounded:
 
 ```text
 Effects(A_t) subseteq M
 ```
 
-The paper should avoid the misleading statement that all authority monotonically shrinks. Delegation may attenuate, while a running task can acquire additional concrete resource facts under the unchanged Mission ceiling.
+Do not state that all authority monotonically shrinks. Delegation can attenuate, while a running task can acquire additional concrete resource facts under the unchanged Mission ceiling.
 
 ## Candidate transition rules
 
 ### Root
 
-A trusted task root may initialize authority:
-
 ```text
-root(r) => r in A_0
+root(r)
+------
+r in A_0
 ```
 
 ### Authorized execution
 
-An effect executes only if its effect type is within `M` and all required resource bindings are satisfied by current authority.
-
 ```text
 e in M and bindings(e,q) satisfied by A_t
-------------------------------------------------
+-----------------------------------------
 execute(e,q)
 ```
 
-No external side effect occurs before this decision.
+No protected external effect occurs before this decision.
 
 ### Evidence derivation
-
-A reviewed extractor may derive a fact from output that is cryptographically/logically bound to an already authorized execution:
 
 ```text
 authorized(e,q) and verify(sigma,o,e,q) and extractor_i(o)=r
@@ -209,13 +214,11 @@ A caller-supplied value alone is insufficient.
 
 ### Selection derivation
 
-For a multi-candidate result:
-
 ```text
 C derived from authorized evidence
 E contains required measurements for C
 S(P,C,E) verifies and returns unique r
-------------------------------------------------
+----------------------------------------
 r in A_(t+1)
 ```
 
@@ -223,289 +226,242 @@ If the witness cannot verify, no generalized selection authority is added.
 
 ### Static fence
 
-If a successful reference execution contains a dynamic-looking value that cannot be safely derived, the prototype may preserve only the observed value:
-
 ```text
-unresolved(r) => r in F
+unresolved(r)
+-------------
+r in F
 ```
 
-This is a conservative engineering fallback, not evidence that the system understood the task semantics.
+This is a conservative fallback. It is not evidence that the system understood the full task semantics.
 
 ### Request non-derivation
 
-A request argument must not create resource authority solely by having appeared in a previous request:
-
 ```text
 q_i contains r
------------------------------
+--------------------
 does not imply r in A_(i+1)
 ```
 
-## Candidate theorem/proposition targets
+A request cannot authorize itself through circular history.
 
-### T1 — Mission non-amplification
+## Formal properties to pursue in the paper
 
-For every reachable task state, no authorized effect lies outside the Mission ceiling.
+### P1 — Mission non-amplification
 
-### T2 — Causal authority provenance
+No reachable task state authorizes a protected effect outside `M`.
 
-Every non-root dynamically authorized resource has a derivation path to verified output evidence or a valid selection witness rooted in authorized execution.
+### P2 — Causal authority provenance
 
-### T3 — No request self-authorization
+Every non-root dynamically authorized resource has a derivation path to verified authorized output or a valid selection witness rooted in authorized execution.
 
-There is no derivation rule in which an agent-supplied request value becomes dynamic authority solely because the value appeared in prior request history.
+### P3 — No request self-authorization
 
-### T4 — Selection soundness
+An agent-supplied request value cannot become dynamic authority solely because it appeared in request history.
 
-If a selector witness authorizes `r`, then `r` belongs to the evidenced candidate set and satisfies the witness predicate over the complete evidence required by that predicate.
+### P4 — Selection soundness
 
-### T5 — Unique-selection fail-closed property
+If a witness authorizes `r`, then `r` belongs to the evidenced candidate set and satisfies the declared selector over the evidence required by that selector.
 
-For selectors requiring a unique winner, ties or incomplete candidate measurements cannot produce generalized selector authority.
+### P5 — Ambiguity fail-closed
 
-### T6 — Counterfactual selector consistency
+For selectors that require a unique winner, ties or incomplete measurements do not produce generalized selection authority.
 
-If the candidate evidence changes while preserving the same selector predicate and a different unique candidate `r'` satisfies that predicate, the same selector contract can authorize `r'` without recompilation from the concrete identifier.
+### P6 — Counterfactual selector consistency
 
-### T7 — Cross-task non-transferability
+If evidence changes and a different unique resource satisfies the same selector, the selector relation can authorize the new resource without recompilation from its concrete identifier.
+
+### P7 — Cross-task non-transferability
 
 Evidence or derived authority from one Task Lease cannot be replayed to expand another Task Lease.
 
-### T8 — Lifecycle non-amplification
-
-Completion, expiry, revocation, and delegation cannot create new authority and must prevent later use according to the runtime semantics.
-
-The final paper should prove a small number rigorously rather than list many informal properties.
+The manuscript should prove a small, defensible subset rigorously rather than list many informal properties.
 
 ## Threat model
 
-### Adversary controls
-
-The evaluation should assume the agent/model may:
+### Adversary can
 
 - choose malicious tool arguments;
-- reorder calls;
-- repeat effects;
-- transplant identifiers observed elsewhere;
-- use an unrelated candidate from a legitimate result set;
-- reuse request values to attempt circular authorization;
-- replay stale/cross-task evidence;
-- exploit ambiguous/tied selectors;
-- omit prerequisite reads/measurements;
-- combine independently valid field values into an unauthorized tuple.
+- reorder or repeat effects;
+- substitute resources;
+- transplant identifiers across tasks;
+- select an unrelated candidate from legitimate output;
+- use request history for circular authorization attempts;
+- replay stale or cross-task evidence;
+- exploit ties or incomplete selector evidence;
+- omit prerequisite measurements;
+- combine independently valid values into an unauthorized tuple;
+- inject adversarial content into tool-visible environments.
 
 ### Trusted computing base
 
-The paper must explicitly identify trust in:
+The paper must identify trust in:
 
-- Mission construction / approved root authority;
-- authorization reference monitor;
-- provider adapter boundary;
+- Mission construction and approved root authority;
+- the authorization reference monitor;
+- the provider adapter/enforcement boundary;
 - execution-evidence integrity;
 - reviewed authority extractors;
-- selector implementation;
+- selection-witness implementations;
 - schema metadata used to project effect arguments.
 
-Current strict evidence is not remote cryptographic provider attestation. That limitation must remain explicit.
+Current evidence is not cryptographic remote-provider attestation.
 
-## Experimental program
+## Completed evaluation program
 
-### E1 — Direct benchmark extraction
+### E1 — 60-task deterministic cohort
 
-Expand from the current 20 selected AgentDojo tasks to a larger task set and, where useful, additional agent benchmarks.
+AgentDojo `0.1.35`, benchmark `v1.2.2`, all 60 user tasks with protected mutations in Slack, Banking, Workspace, and Travel.
 
-Report:
+Primary complete result:
 
-- task coverage;
-- projected effects;
-- eligible lineage facts;
-- recovered facts;
-- false/static inferences;
-- unresolved/fenced facts;
-- task-specific exception count.
+- 60/60 reference executions preserved;
+- 36/36 evidence-consistent counterfactuals accepted;
+- 1/36 accepted by exact-trace baseline;
+- 370/370 corrected mutants blocked.
 
-A growing exception count is a redesign signal.
+### E2 — Provider-boundary adversarial families
 
-### E2 — Open-world selector benchmark
+Constructed and blocked:
 
-Build a benchmark where the resource identifier is intentionally unknown at task entry.
+- 60 field/resource substitutions;
+- 60 premature/reordered effects;
+- 60 repeated effects;
+- 46 exact cross-task transplants;
+- 4 wrong-selector candidates.
 
-Selector families should include:
+Total: **230/230 blocked, 0 malicious provider reaches**.
 
-- exact value from authoritative output;
-- unique prefix/suffix or typed attribute match;
-- argmin/argmax over complete measurements;
-- threshold selection;
-- conjunction over typed attributes;
-- created-resource identity;
-- derived numeric bound;
-- cross-provider identity mapping where evidence supports it.
+### E3 — DeepSeek V4 Pro live evaluation
 
-Negative cases should include:
+The intended frozen plan contained 5,088 task-runs across four suites and three trials.
 
-- candidate membership without selection evidence;
-- ties;
-- incomplete measurements;
-- stale measurements;
-- changed candidate sets;
-- request-only provenance;
-- malicious decoy candidate;
-- cross-task transplant.
+The primary zero-error gate failed because the paid evaluation did not complete.
 
-### E3 — Compromised-model evaluation
+Attempt 3 exposed adaptive YAML serialization failure and later balance exhaustion. Attempt 4 fixed delivery plumbing without changing the authority mechanism, then stopped when the DeepSeek account returned `402 Insufficient Balance`.
 
-Run actual agents/models rather than only ground-truth traces.
+Use the matched Attempt-4 Slack slice as partial live evidence. Use Attempt 3 only as supplementary canonical-attack replication.
 
-Evaluate at minimum:
+See `PAPER_RESULTS_DRAFT.md` and `LIVE_EVAL_ATTEMPTS.md` for exact numbers and wording.
 
-- normal benign task completion;
-- prompt-injected trajectories;
-- explicitly malicious tool-choice model/oracle;
-- opportunistic policy probing.
+## Negative result to preserve
 
-Measure unauthorized **provider-boundary effects**, not only model intentions.
+V1 falsifies the idea that a single successful execution trace can be copied directly into the exact semantic authorization policy.
 
-### E4 — Baseline comparison
+A trace can contain:
 
-At minimum compare against representative nearby approaches where implementable and fair:
+- incidental timestamps;
+- arbitrary formatting;
+- free text choices;
+- demonstration-specific narrowing;
+- values that conflict with the user's explicit request.
+
+`travel-4` and `travel-7` provide concrete calendar-time examples.
+
+The next research direction is a **semantic authority envelope** that classifies values as:
+
+- required constants;
+- bounded/ranged values;
+- evidence-derived values;
+- selection-derived values;
+- incidental/free execution choices.
+
+## Required baseline and ablation work for a stronger journal paper
+
+V1 does not complete this matrix. Community or paper-extension work should compare, where fair and reproducible:
 
 - broad standing/provider authority;
-- field-wise/static allowlist;
-- precomputed task-scoped authority;
+- exact trace/static allowlist;
+- field-wise policies;
 - provenance-only dynamic authority;
-- strict output-evidence authority without selectors;
-- strict output + selection witnesses (proposed system).
+- output-evidence authority without selection witnesses;
+- output evidence plus selection witnesses.
 
-The related-work audit must also discuss PAuth, Bounded Agents, AgentFlow, Progent, CaMeL, Task Shield, classic task-based access control, capability attenuation/Macaroons, and relevant history-based authorization work.
+Important ablations include:
 
-Do not fabricate direct quantitative comparisons to systems that cannot be reproduced. For such systems, make architectural/qualitative comparisons separately.
+1. remove state/history;
+2. remove output provenance;
+3. permit request provenance;
+4. treat candidate membership as authority;
+5. remove selection witnesses;
+6. remove tuple/correlation relations;
+7. remove cardinality ceilings;
+8. remove precedence constraints;
+9. remove fail-closed static fencing;
+10. permit incomplete selector evidence.
 
-### E5 — Performance and usability cost
-
-Measure:
-
-- compile time;
-- authorization decision latency;
-- evidence size;
-- runtime storage;
-- additional reads/measurements required to construct a witness;
-- false step-up/static-fence rate;
-- number of user approvals;
-- task completion impact.
-
-## Required ablations
-
-The paper should include ablations that remove one mechanism at a time:
-
-1. no state/history;
-2. no output provenance;
-3. allow request provenance;
-4. candidate membership treated as authority;
-5. no selector witnesses;
-6. no tuple relations;
-7. no cardinality ceilings;
-8. no precedence requirements;
-9. no static fail-closed fence;
-10. incomplete selector evidence allowed.
-
-The most important expected ablations are (3) and (4), because the pilot already found concrete safety failures there.
+Do not fabricate quantitative comparisons to systems that cannot be reproduced.
 
 ## Metrics
 
-Primary metrics:
+Primary:
 
 - benign task completion / secure utility;
-- unauthorized effect rate at provider boundary;
-- mutant block rate by family;
-- counterfactual dynamic-generalization acceptance;
-- lineage precision/recall;
-- false step-up/static-fence rate;
+- unauthorized protected effect rate at provider boundary;
+- block rate by adversarial family;
+- counterfactual acceptance;
+- selector correctness under changed evidence;
 - task-specific exception count.
 
-Secondary metrics:
+Secondary:
 
+- lineage precision/recall;
+- false step-up/static-fence rate;
+- decision latency;
 - policy size;
-- inference/runtime overhead;
 - evidence storage;
 - user approval count;
-- selector coverage by predicate family.
+- selector coverage by family.
 
-Avoid presenting one aggregate safety percentage without per-family results.
+Keep attempted model behavior separate from successful provider effects.
 
-## Paper structure candidate
+## Paper structure
 
-1. Introduction and open-world authority problem
-2. Background and related work
+Recommended manuscript structure:
+
+1. Introduction
+2. Open-world task authority problem
 3. Threat model and system model
 4. Evidence-grounded dynamic authority
-5. Selection witnesses
+5. Candidate/selection separation and selection witnesses
 6. Formal properties
-7. Implementation in Agent Authority
+7. Agent Authority implementation
 8. Evaluation methodology
-9. Results
-10. Ablations and failure analysis
-11. Limitations
-12. Discussion and deployment implications
-13. Related work synthesis
-14. Conclusion
+9. Deterministic and provider-boundary results
+10. Partial live-model results
+11. Negative results and failure analysis
+12. Baselines and ablations
+13. Limitations
+14. Related work
+15. Discussion and deployment implications
+16. Conclusion
 
-## Current evidence checkpoint
+## Claim rules
 
-As of commit `d1a9da9e5653411ba79ce28935f478183bb6d153`:
+The paper may strongly claim the complete deterministic/provider-boundary results.
 
-- direct AgentDojo research workflow: green;
-- normal Agent Authority CI on the same branch generation: green;
-- direct tasks: 20/20 base accepted;
-- strict evidence-consistent variants: 11/11 accepted;
-- strict generated mutants: 141/141 blocked;
-- controlled selection-witness cases: 6/6 passed;
-- positive selector kinds demonstrated: prefix, unique argmax, unique argmin;
-- winner-changing selector counterfactuals: 3/3 accepted;
-- tie/incomplete/request-circular negative cases: blocked;
-- unsafe unresolved dynamic authority: 0.
+The paper may report the partial DeepSeek result with its matched-scenario analysis.
 
-These results justify continuing the research program. They do **not** by themselves justify a Q1 submission.
+The paper must **not** claim:
 
-## Publication stop/go criteria
+- that all 5,088 live runs completed;
+- that the preregistered `scientific_go` gate passed;
+- that all ungated out-of-policy effects were exact attacker-goal completions;
+- that prompt injection is solved;
+- that Attempt 4 provides live Workspace or Travel evidence;
+- that V1 establishes multi-model robustness;
+- that the current grammar is formally proven or minimal;
+- that the 60-task development cohort is a held-out distribution.
 
-### Continue / GO
+## Paper readiness decision
 
-Continue if the expanded experiments preserve all of these:
+**GO for manuscript drafting from the closed V1 evidence package.**
 
-- no task-specific authorization exceptions, or a clearly bounded very small rate with principled explanation;
-- strong counterfactual utility for newly discovered resources;
-- near-zero or zero unauthorized provider-boundary effects under generated adversarial traces;
-- selector soundness under ties, incomplete evidence, stale evidence, and changed winners;
-- measurable advantage over provenance-only and static/precomputed baselines;
-- acceptable false-step-up and overhead cost.
+The next paper work is:
 
-### Redesign / HOLD
+1. refresh the related-work novelty audit;
+2. select a journal or conference and adopt its template;
+3. formalize the smallest defensible set of properties;
+4. build publication figures and tables from the frozen results;
+5. decide whether additional baselines/ablations are required by the target venue.
 
-Hold the paper if:
-
-- selector inference requires task-ID-specific rules;
-- request history must be trusted as authority to preserve utility;
-- broad candidate membership must be authorized to complete common tasks;
-- most dynamic values fall back to static fencing;
-- model-in-loop secure utility collapses;
-- the mechanism cannot be distinguished technically from stronger existing systems after full related-work verification.
-
-### Submission-ready gate
-
-Do not call the work submission-ready until:
-
-1. formal semantics are written and internally reviewed;
-2. key properties have proofs or mechanically checked arguments;
-3. expanded benchmark results are reproducible from a clean environment;
-4. model-in-loop adversarial evaluation is complete;
-5. baseline/ablation matrix is complete;
-6. related-work novelty audit is refreshed immediately before writing claims;
-7. limitations and negative results are included rather than hidden.
-
-## Current decision
-
-**GO for a full research program and paper prototype.**
-
-**NOT YET GO for Q1 submission.**
-
-The current results are strong enough to justify formalization and expanded evaluation. The next scientific bottleneck is no longer basic feasibility; it is external validity, formal soundness, and comparison against the closest prior work.
+Do not reopen V1 experimental collection merely because the original live matrix was incomplete. New experiments should answer a new scientific question.

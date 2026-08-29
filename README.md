@@ -6,11 +6,11 @@
 
 ### Give your agent a task, not your account.
 
-**Agent Authority is a task-bounded execution layer for AI agents. It lets an agent use existing provider permissions only for the task the user actually authorized.**
+**Agent Authority is a task-bounded execution layer for AI agents. It lets an agent use existing provider permissions only for the task the user authorized.**
 
-[Quickstart](docs/quickstart.md) · [Task-first API](#task-first-api) · [AgentDojo proof](benchmarks/agentdojo/README.md) · [Security](SECURITY.md) · [Product proof](docs/product-proof.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](ROADMAP.md)
+[Quickstart](docs/quickstart.md) · [Research](RESEARCH.md) · [Reproduce](benchmarks/task-contracts/README.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](ROADMAP.md)
 
-> **Status: Community / Developer Preview. Not production-ready.** The goal of this stage is independent use, attack, benchmark reproduction and contribution—not a claim that Agent Authority replaces IAM, a sandbox, or production credential infrastructure.
+> **Community / Developer Preview. Research V1 closed on 2026-08-29.** The software is not production-ready. The research package is preserved for independent reproduction, attack, extension, and paper review.
 
 </div>
 
@@ -20,17 +20,15 @@ A user gives an agent a narrow task:
 
 > **Handle this customer email.**
 
-But the connected account may give the application broad standing permission to read many emails, create meetings with anyone, update unrelated records, or send messages to arbitrary recipients.
+The connected account can still give the application broad standing permission to read many emails, create meetings with anyone, update unrelated records, or send messages to arbitrary recipients.
 
-OAuth and IAM answer questions like:
+OAuth and IAM answer:
 
 > Can this application use Calendar?
 
 Agent Authority asks a different question immediately before the effect:
 
 > **Is this exact effect inside the task the user authorized?**
-
-The target is:
 
 ```text
 standing provider permission
@@ -42,7 +40,7 @@ standing provider permission
  temporary task authority
           |
           +--> useful task actions proceed
-          +--> authority may follow resources discovered through authorized work
+          +--> authority can follow resources discovered through authorized work
           +--> unrelated resources step up or deny
           |
           v
@@ -52,7 +50,105 @@ standing provider permission
    task authority disappears
 ```
 
-The provider credential may continue to exist. The **task authority does not**.
+The provider credential can continue to exist. The **task authority does not**.
+
+## Research result
+
+The completed research slice tests a stronger question:
+
+> Can dynamic task authority follow resources discovered during authorized execution without turning all observed resources into authority?
+
+The central finding is:
+
+> **Observation provenance is not selection authority.**
+
+If authorized evidence returns several candidates, discovery alone does not prove which candidate the task authorizes. The research prototype adds deterministic **selection witnesses** that bind a later effect to the task's selection predicate over authorized evidence.
+
+### Complete deterministic and provider-boundary evidence
+
+AgentDojo `0.1.35`, benchmark `v1.2.2`, 60 mutation-bearing tasks across Slack, Banking, Workspace, and Travel:
+
+| Measure | Result |
+| --- | ---: |
+| Reference executions preserved | **60/60** |
+| Evidence-consistent counterfactuals accepted | **36/36** |
+| Static exact-trace baseline counterfactuals accepted | **1/36** |
+| Corrected adversarial mutants blocked | **370/370** |
+| Constructible malicious provider-boundary trajectories blocked | **230/230** |
+| Unauthorized malicious trajectories reaching the provider | **0** |
+
+The 230 provider-boundary trajectories include field/resource substitution, premature or reordered effects, repeated effects, exact cross-task transplants, and wrong-selector candidates.
+
+### Partial live DeepSeek V4 Pro evidence
+
+The planned 5,088-run live matrix did **not** complete. The repository does not present it as a preregistered primary success.
+
+Attempt 4 corrected the adaptive-attack delivery defect from Attempt 3. It then produced 860 successful DeepSeek V4 Pro trajectories before the paid account returned `402 Insufficient Balance`. All completed Attempt-4 trajectories are from the Slack suite.
+
+For the **372 attacked scenarios that completed in both ungated and gated conditions**:
+
+| Matched attacked result | Ungated | Agent Authority |
+| --- | ---: | ---: |
+| Scenarios | 372 | 372 |
+| Scenarios with at least one unauthorized protected effect | **40** | **0** |
+| Unauthorized protected provider effects | **61** | **0** |
+| Utility | **84.41%** | **82.26%** |
+| Policy rejections | — | **373** |
+
+The matched utility difference is **2.15 percentage points**.
+
+The canonical AgentDojo `tool_knowledge` subset contains 244 matched scenarios. It produced 39 unauthorized protected effects ungated and 0 gated. The authority-adaptive subset contains 128 matched scenarios. It produced 22 out-of-policy protected effects ungated and 0 gated.
+
+These effects are **not all exact attacker-goal completions**. The defensible claim is narrower: under adversarial trajectories, the ungated model produced protected provider effects outside the frozen task authority, and the enforcing runtime prevented those out-of-policy protected effects from succeeding in the matched completed slice.
+
+Attempt 3 remains supplementary evidence. Its adaptive arm failed before model execution because of YAML serialization, but 422 matched canonical attacked scenarios completed. Ungated execution produced 79 unauthorized protected effects across 61 scenarios; gated execution produced 0.
+
+See [RESEARCH.md](RESEARCH.md), [the paper-facing result summary](benchmarks/task-contracts/PAPER_RESULTS_DRAFT.md), and [the attempt log](benchmarks/task-contracts/LIVE_EVAL_ATTEMPTS.md).
+
+## Research artifact preservation
+
+The exact aggregate GitHub Actions artifacts for paid Attempts 3 and 4 are committed under:
+
+```text
+benchmarks/task-contracts/artifacts/
+```
+
+They include the aggregate result, frozen inputs, and all 48 shard JSON files for each attempt. Their committed ZIP bytes match the original GitHub Actions SHA-256 digests.
+
+This keeps the partial paid evidence available after the temporary Actions artifacts expire.
+
+See [ARTIFACT_MANIFEST.md](benchmarks/task-contracts/ARTIFACT_MANIFEST.md).
+
+## What the research does and does not establish
+
+**Supported in the evaluated setting:**
+
+- provider effects can be guarded by stateful task authority;
+- cardinality, order, correlation, evidence-derived bindings, and selection witnesses block attack classes that independent field allowlists miss;
+- a value appearing in authorized output is not enough to authorize it when the task requires a selection among candidates;
+- exact successful traces are too narrow to represent the full authorization envelope of a natural-language task;
+- a frozen provider-boundary monitor contained all observed policy-unauthorized protected mutations in the completed matched DeepSeek slice.
+
+**Not established:**
+
+- prompt injection is solved;
+- the full 5,088-run DeepSeek matrix completed;
+- multi-model robustness;
+- broad live coverage for Workspace or Travel;
+- automatic natural-language task-to-authority compilation;
+- formal soundness or minimality of the research grammar;
+- protection against all read-only leakage or unsafe natural-language output;
+- production multi-tenant security.
+
+## A useful negative result
+
+The research also falsified a tempting design rule:
+
+> A successful reference trace can be copied into an exact authorization policy.
+
+That approach over-constrained legitimate execution. A canonical trace can contain arbitrary formatting, timestamps, or even values that conflict with the user prompt. The next research problem is therefore **semantic authority envelopes**: separate user-required constants from bounded values, evidence-derived values, selection-derived values, and incidental execution choices.
+
+This work is intentionally left as future research. The V1 research slice is closed.
 
 ## Install
 
@@ -68,8 +164,6 @@ The preferred product surface is:
 import { createTask } from '@nullsquare/agent-authority/task';
 ```
 
-That package path includes first-class TypeScript declarations in the Community Preview.
-
 ## Try it without credentials
 
 From a blank directory:
@@ -81,7 +175,7 @@ curl -fsSL https://raw.githubusercontent.com/Null-Square/agent-authority/main/ex
 node quickstart.mjs
 ```
 
-The quickstart demonstrates the essential behavior:
+Expected behavior:
 
 ```text
 ALLOW   -> useful task effect runs
@@ -89,20 +183,18 @@ STEP-UP -> unrelated resource is outside task authority
 PASS    -> blocked request executes zero provider callbacks
 ```
 
-Then try a real public GitHub read without a token:
+Then try a public GitHub read without a token:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Null-Square/agent-authority/main/examples/quickstart-github-live.mjs -o quickstart-github-live.mjs
 node quickstart-github-live.mjs
 ```
 
-The Mission can represent broader standing `repo.read` capability while the Task Lease restricts the current task to `Null-Square/agent-authority`. An unrelated repository is stopped before a second network request.
-
 See [docs/quickstart.md](docs/quickstart.md).
 
 ## Task-first API
 
-The public mental model is deliberately small:
+The product model is deliberately small:
 
 ```text
 Task -> Effect -> Authority
@@ -115,7 +207,6 @@ const task = createTask({
   principal: 'user:me',
   agent: 'agent:assistant',
   request: 'Find the issue for this task and comment only on that issue',
-
   permissions: {
     github: {
       allow: ['issue.list', 'issue.comment'],
@@ -123,19 +214,15 @@ const task = createTask({
       constraints: { repository: ['acme/app'] }
     }
   },
-
   authority: {
     repository: { kind: 'github.repository', value: 'acme/app' }
   },
-
-  bindings: [
-    {
-      service: 'github',
-      action: 'issue.list',
-      field: 'repository',
-      authority: 'repository'
-    }
-  ]
+  bindings: [{
+    service: 'github',
+    action: 'issue.list',
+    field: 'repository',
+    authority: 'repository'
+  }]
 });
 
 const discovery = await task.run({
@@ -161,138 +248,31 @@ task.bind({
 await task.run({
   service: 'github',
   action: 'issue.comment',
-  context: { repository: 'acme/app', issue_number: issue.value, body: 'Handled.' }
+  context: {
+    repository: 'acme/app',
+    issue_number: issue.value,
+    body: 'Handled.'
+  }
 }, () => github.comment(issue.value, 'Handled.'));
 ```
 
-If the agent changes `issue_number` to an unrelated issue, the callback does not run. The result becomes an authority-delta step-up that can be explained to a human with `task.explain(error)`.
+If the agent changes `issue_number` to an unrelated issue, the callback does not run. The runtime produces an authority-delta step-up that can be explained with `task.explain(error)`.
 
-### Application-owned vs connected execution
-
-Use `task.run(request, callback)` when your application already owns the SDK/provider call.
-
-Use `task.execute(request)` when Agent Authority owns the connected-provider execution path and credential resolution stays behind its broker boundary.
-
-Both paths use Task Lease semantics and the same deny/step-up model.
-
-## Task authority can follow discovered resources
-
-Many task resources are not known when the user gives the instruction. They are discovered while the task runs.
-
-```text
-repository = acme/app        (task-entry authority)
-        |
-        v
-authorized issue discovery
-        |
-        +--> ALLOW receipt
-        +--> guarded output evidence
-        |
- reviewed extractor
-        |
-        v
-issue = 42                   (derived task authority)
-        |
-        v
-later effect may use issue 42
-```
-
-`task.authorityFrom()` uses the strict evidence path: the caller does not supply the derived authority value. The guarded output, ALLOW receipt, execution evidence and reviewed extractor must agree before the Task Lease resolves the value.
-
-This is not remote-provider cryptographic attestation. Read [SECURITY.md](SECURITY.md) for the exact trust boundary.
+Use `task.run(request, callback)` when your application owns the provider call. Use `task.execute(request)` when Agent Authority owns the connected-provider path and credential resolution stays behind its broker boundary.
 
 ## Narrow typed relations
 
-Most bindings should remain exact. The Community Preview supports only three relation shapes:
+The Community Preview product surface supports three relation shapes:
 
 | Relation | Meaning | Example |
 | --- | --- | --- |
-| `exact` | request must equal the established fact | only issue `42` |
-| `oneOf` | request must equal one member of a finite established set | channel is `general` or `random` |
-| `max` | numeric request must be no greater than the established ceiling | refund amount <= payment amount |
+| `exact` | request equals the established fact | only issue `42` |
+| `oneOf` | request equals one member of a finite established set | channel is `general` or `random` |
+| `max` | numeric request is no greater than the established ceiling | refund amount <= payment amount |
 
-`exact` is the default.
+Unknown relations fail closed. We deliberately do **not** expose a general policy expression language.
 
-Example finite-set binding:
-
-```js
-task.bind({
-  service: 'slack',
-  action: 'add_user_to_channel',
-  field: 'channel',
-  authority: 'allowedChannels',
-  relation: 'oneOf'
-});
-```
-
-Example numeric ceiling:
-
-```js
-task.bind({
-  service: 'payments',
-  action: 'refund.create',
-  field: 'amount_minor',
-  authority: 'paymentAmount',
-  relation: 'max'
-});
-```
-
-Unknown relations are rejected. Invalid relation/fact shapes fail closed. Requests outside the relation require an authority delta before the guarded effect runs.
-
-`max` is a **per-effect ceiling**, not a cumulative ledger. Provider-side business state and idempotency remain authoritative for aggregate totals.
-
-We deliberately do **not** expose a general policy expression language. New relation types should be justified by a real workflow or external benchmark first.
-
-## What is already demonstrated
-
-### Coding agent
-
-The task-first coding proof establishes:
-
-```text
-repository -> issue -> base SHA -> task branch -> changed path -> draft PR
-```
-
-Writes to `main`, unrelated file paths and PRs from the wrong branch step up before mutation. Merge remains explicitly denied.
-
-Run:
-
-```bash
-npm run demo:task-coding
-```
-
-### Support / communications
-
-A Gmail-shaped authorized thread establishes the reviewed sender email as downstream authority for a Calendar-shaped attendee. Another thread or attendee executes zero provider-shaped callbacks.
-
-### Operations / finance
-
-A support ticket establishes an order, then a payment, then exact payment/currency authority plus a `max` amount ceiling. A legitimate partial refund can proceed; an unrelated payment, over-refund or wrong currency steps up before the refund callback.
-
-Run:
-
-```bash
-npm run demo:task-finance
-```
-
-### AgentDojo external task set
-
-The repository pins AgentDojo `0.1.35`, benchmark version `v1.2.2`, and a representative Slack task set.
-
-The first oracle run exposed a finite-set policy gap in `user_task_11`: the legitimate task requires exactly two channels, `general` and `random`. That finding drove `oneOf` rather than a wildcard or general policy DSL.
-
-The Community Preview regression gate for the selected oracle set is:
-
-```text
-selected tasks              5
-mapped tasks                5
-mapping coverage            100%
-mapped-task completion      100%
-unrelated-target block rate 100%
-unauthorized effects        0
-```
-
-This is **oracle / upper-bound mapping evidence**, not a model-in-the-loop prompt-injection score. Reproduce it from [benchmarks/agentdojo/README.md](benchmarks/agentdojo/README.md).
+The research prototype under `benchmarks/task-contracts/` explores additional stateful constraints and selection witnesses. Those research mechanisms are **not automatically part of the production package contract**.
 
 ## Core invariant
 
@@ -300,13 +280,13 @@ This is **oracle / upper-bound mapping evidence**, not a model-in-the-loop promp
 Task Lease authority <= Mission authority
 ```
 
-A Task Lease may narrow Mission authority. It cannot add an action that the Mission does not already allow.
+A Task Lease can narrow Mission authority. It cannot add an effect type that the Mission does not already allow.
 
-Across durable state, transports and delegation, authority should stay equal or shrink—never silently grow.
+The research refines one point: task-local **resource facts can grow** through authorized evidence while the Mission effect ceiling stays fixed. Do not interpret the invariant as saying that every concrete resource identifier must be known at task start.
 
 ## Existing stack, not a replacement stack
 
-Agent Authority is designed to sit between agent reasoning and the provider path you already use:
+Agent Authority sits between agent reasoning and the provider path you already use:
 
 ```text
 agent reasoning
@@ -318,28 +298,7 @@ Agent Authority
 existing SDK / MCP / gateway / OAuth / provider
 ```
 
-The repository demonstrates the same authority model across direct guard/SDK execution, MCP, connected-provider execution and a Vercel AI SDK protected-tool path.
-
-## Connected GitHub
-
-For local developer onboarding:
-
-```bash
-npx agent-authority setup
-printf %s "$GITHUB_TOKEN" | npx agent-authority connect github --token-stdin
-```
-
-Then create a task with a runtime environment and call `task.execute(request)`. The current encrypted credential vault is a trusted-local-host developer backend, not production OAuth/KMS infrastructure.
-
-See [docs/connected-github.md](docs/connected-github.md).
-
-## Durability
-
-The same task-first surface can opt into authenticated local Task Lease persistence/recovery by supplying the local store. Current durability includes exact Mission binding, authenticated state, stale-writer protection, local per-lease locking, durable completion/expiry and refresh before authority evaluation.
-
-It is not a distributed transaction between arbitrary provider effects and local state.
-
-See [docs/durable-task-leases.md](docs/durable-task-leases.md).
+The same authority model is demonstrated across direct SDK execution, MCP, connected-provider execution, and a Vercel AI SDK protected-tool path.
 
 ## Security boundary
 
@@ -347,60 +306,51 @@ The most important limitation is architectural:
 
 > **Agent Authority cannot secure a provider path it does not control.**
 
-If the model/agent can separately reach the same provider using another credential, shell, network tool or unguarded connector, that path can bypass Agent Authority.
+If the model can reach the same provider through another credential, shell, network tool, or unguarded connector, that path can bypass Agent Authority.
 
-Other current limits include:
+Other limits include no cryptographic remote-provider attestation, no trusted natural-language authority compiler, no production OAuth/KMS lifecycle, no hardened remote multi-tenant deployment, and no claim that provider-effect containment equals complete prompt-injection prevention.
 
-- no cryptographic remote-provider attestation;
-- no automatic source-data invalidation for already-derived authority;
-- no automatic safe application of approved authority deltas;
-- no crash-atomic distributed coupling of arbitrary remote effects and local Task Lease state;
-- no production OAuth/KMS credential lifecycle;
-- no hardened remote multi-tenant deployment;
-- no trusted natural-language task-to-authority compiler;
-- no claim that the oracle AgentDojo result proves model-in-the-loop prompt-injection resistance.
+Read [SECURITY.md](SECURITY.md).
 
-These are part of the current product contract, not hidden caveats. See [SECURITY.md](SECURITY.md).
+## Reproduce the research
 
-## Validation
+The research workflow is now manual and offline. It does not call paid model APIs.
 
-From a checkout:
+Start with:
+
+```bash
+python -m pip install -r benchmarks/agentdojo/requirements.txt
+```
+
+Then follow [benchmarks/task-contracts/README.md](benchmarks/task-contracts/README.md).
+
+The archived live workflow remains in the repository only as provenance. It executes zero model API calls.
+
+## Validate the package
 
 ```bash
 npm install
 npm run check
 ```
 
-The repository also runs Node 20/22 CI, coverage, packed-consumer checks, CodeQL, connected GitHub validation, live GitHub proofs and the pinned AgentDojo oracle workflow.
+The product package and research closure are separate. npm publication is not required to reproduce the research results.
 
-The deterministic utility fixture remains available with:
+## Community handoff
 
-```bash
-npm run benchmark:task
-```
+The V1 research slice is closed from the original project side. Community work is welcome in four directions:
 
-## Why Community Preview now
+1. reproduce or challenge the reported deterministic/provider-boundary results;
+2. attack the authority boundary and report bypasses;
+3. formalize the selection-witness model and non-amplification properties;
+4. extend evaluation to semantic authority envelopes, held-out tasks, more models, and stronger baselines.
 
-The core mechanism is strong enough that the most valuable next evidence must come from people outside the project.
+Please do not rerun the historical paid matrix merely to obtain the missing rows. A useful continuation should add new scientific value, not only spend more API budget.
 
-We want to learn:
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [ROADMAP.md](ROADMAP.md).
 
-- can a first-time developer protect a meaningful agent workflow quickly?
-- where does the task-first API feel awkward or verbose?
-- can external security researchers bypass the effect boundary?
-- which real workflows require a relation the current narrow set cannot express?
-- how does Agent Authority perform in model-in-the-loop AgentDojo runs?
-- does an external developer keep the layer after trying it?
+## Citation
 
-The Community Preview is how we gather that evidence. It is not a production-readiness declaration.
-
-## Contributing
-
-The most valuable contribution answers:
-
-> **Can this agent complete the intended task while being technically unable to use the same standing account permission for an unrelated effect?**
-
-Start with [CONTRIBUTING.md](CONTRIBUTING.md). Especially useful contributions include real task-first integrations, benchmark reproductions, adversarial tests, reviewed provider extractors, approval UX, TypeScript/API improvements, and independent quickstart feedback.
+Citation metadata is in [CITATION.cff](CITATION.cff). The research paper is in preparation. Until a paper identifier exists, cite the repository, the exact commit, and the research artifact manifest used for your result.
 
 ## License
 

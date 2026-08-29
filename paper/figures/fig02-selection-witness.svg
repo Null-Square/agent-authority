@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 620" role="img" aria-labelledby="title desc">
+  <title id="title">Observation provenance versus selection authority</title>
+  <desc id="desc">The left panel shows an unsafe provenance-only rule where any observed candidate gains authority. The right panel shows a selection witness that requires task predicate, candidates, and complete authorized measurements to produce a unique winner. Ties and incomplete evidence fail closed.</desc>
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#0a0a0a"/></marker>
+    <marker id="ay" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#b08b00"/></marker>
+  </defs>
+  <rect width="1400" height="620" fill="#fff"/>
+  <text x="60" y="54" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="700" fill="#0a0a0a">Observation provenance is not selection authority</text>
+  <text x="60" y="84" font-family="Inter,Arial,sans-serif" font-size="16" fill="#5f6368">A multi-candidate read proves what was observed, not which candidate the user's task selected.</text>
+
+  <!-- split -->
+  <line x1="700" y1="118" x2="700" y2="570" stroke="#d9dadd" stroke-width="2"/>
+
+  <!-- left -->
+  <text x="80" y="142" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700" fill="#0a0a0a">A. Provenance-only rule — unsafe</text>
+  <rect x="80" y="178" width="540" height="76" fill="#f7f7f5" stroke="#8f9297" stroke-width="1.5"/>
+  <text x="104" y="207" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700" fill="#0a0a0a">Authorized read result</text>
+  <text x="104" y="235" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#0a0a0a">candidates = [Alice, Charlie]</text>
+  <path d="M350 254 L350 297" stroke="#0a0a0a" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="126" y="302" width="448" height="62" fill="#fff" stroke="#0a0a0a" stroke-width="1.5"/>
+  <text x="350" y="328" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="600" fill="#0a0a0a">Alice appeared in authorized evidence</text>
+  <text x="350" y="350" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" fill="#5f6368">observed(Alice) = true</text>
+  <path d="M350 364 L350 407" stroke="#0a0a0a" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="126" y="412" width="448" height="62" fill="#fff" stroke="#0a0a0a" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="350" y="438" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="600" fill="#0a0a0a">Naive derivation: authority(Alice)</text>
+  <text x="350" y="460" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" fill="#5f6368">observation ⇒ authority</text>
+  <path d="M350 474 L350 516" stroke="#0a0a0a" stroke-width="2" marker-end="url(#a)"/>
+  <text x="350" y="548" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700" fill="#0a0a0a">Mutate Alice</text>
+  <line x1="428" y1="529" x2="452" y2="553" stroke="#e5484d" stroke-width="4"/>
+  <line x1="452" y1="529" x2="428" y2="553" stroke="#e5484d" stroke-width="4"/>
+  <text x="350" y="574" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="13" fill="#5f6368">Wrong: Charlie is the aggregate winner.</text>
+
+  <!-- right -->
+  <text x="760" y="142" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700" fill="#0a0a0a">B. Selection witness — evidence grounded</text>
+
+  <rect x="760" y="178" width="560" height="76" fill="#f7f7f5" stroke="#8f9297" stroke-width="1.5"/>
+  <text x="784" y="207" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700" fill="#0a0a0a">Task selector P</text>
+  <text x="784" y="235" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" fill="#0a0a0a">argmax(total messages per user)</text>
+
+  <rect x="760" y="274" width="264" height="96" fill="#fff" stroke="#0a0a0a" stroke-width="1.5"/>
+  <text x="784" y="303" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700" fill="#0a0a0a">Candidate set C</text>
+  <text x="784" y="333" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" fill="#5f6368">Alice</text>
+  <text x="784" y="354" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" fill="#5f6368">Charlie</text>
+
+  <rect x="1056" y="274" width="264" height="96" fill="#fff" stroke="#0a0a0a" stroke-width="1.5"/>
+  <text x="1080" y="303" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700" fill="#0a0a0a">Authorized E</text>
+  <text x="1080" y="333" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" fill="#5f6368">Alice = 17</text>
+  <text x="1080" y="354" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" fill="#5f6368">Charlie = 24</text>
+
+  <path d="M1040 254 L1040 396" stroke="#0a0a0a" stroke-width="2"/>
+  <path d="M892 370 L892 396 L1040 396" fill="none" stroke="#0a0a0a" stroke-width="2"/>
+  <path d="M1188 370 L1188 396 L1040 396" fill="none" stroke="#0a0a0a" stroke-width="2"/>
+  <path d="M1040 396 L1040 422" stroke="#0a0a0a" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="820" y="428" width="440" height="68" fill="#f5d13a" stroke="#0a0a0a" stroke-width="2"/>
+  <text x="1040" y="456" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700" fill="#0a0a0a">Selection witness S(P, C, E)</text>
+  <text x="1040" y="480" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" fill="#0a0a0a">unique winner = Charlie</text>
+  <path d="M1040 496 L1040 526" stroke="#b08b00" stroke-width="3" marker-end="url(#ay)"/>
+  <text x="1040" y="554" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700" fill="#0a0a0a">authority(Charlie)</text>
+
+  <path d="M1278 428 L1330 428 L1330 534" fill="none" stroke="#8f9297" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="1302" y="455" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="12" fill="#5f6368" transform="rotate(90 1302 455)">tie or incomplete evidence</text>
+  <line x1="1318" y1="534" x2="1340" y2="556" stroke="#0a0a0a" stroke-width="3"/>
+  <line x1="1340" y1="534" x2="1318" y2="556" stroke="#0a0a0a" stroke-width="3"/>
+  <text x="1280" y="582" font-family="Inter,Arial,sans-serif" font-size="12" fill="#5f6368">fail closed</text>
+
+  <text x="760" y="600" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">Selection authority requires sufficient evidence for the task relation; request history alone cannot justify itself.</text>
+</svg>

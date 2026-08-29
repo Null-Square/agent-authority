@@ -188,9 +188,11 @@ Use these files as the source of truth:
 - `benchmarks/task-contracts/LIVE_EVAL_PROTOCOL.md` — frozen live protocol;
 - `benchmarks/task-contracts/LIVE_EVAL_ATTEMPTS.md` — complete attempt history;
 - `benchmarks/task-contracts/live-eval-freeze.json` — frozen mechanism hashes/configuration;
-- `benchmarks/task-contracts/ARTIFACT_MANIFEST.md` — permanent evidence archive map;
-- `benchmarks/task-contracts/artifacts/deepseek-attempt-3.zip` — exact Attempt-3 aggregate artifact;
-- `benchmarks/task-contracts/artifacts/deepseek-attempt-4.zip` — exact Attempt-4 aggregate artifact.
+- `benchmarks/task-contracts/ARTIFACT_MANIFEST.md` — original Actions artifact IDs, hashes, and preservation rules;
+- `benchmarks/task-contracts/artifacts/attempt-3-summary.json` — machine-readable Attempt-3 closure summary;
+- `benchmarks/task-contracts/artifacts/attempt-4-summary.json` — machine-readable Attempt-4 closure summary.
+
+The original raw paid-run ZIPs are identified by immutable Actions artifact IDs and SHA-256 digests in the manifest. They are not claimed to be stored in Git history.
 
 ## Reproduction
 

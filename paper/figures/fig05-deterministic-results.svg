@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 760" role="img" aria-labelledby="title desc">
+  <title id="title">Completed deterministic and provider-boundary results</title>
+  <desc id="desc">Reference utility is 60 of 60, evidence-consistent counterfactual acceptance is 36 of 36 versus 1 of 36 for the exact-trace baseline, corrected mutants blocked are 370 of 370, provider-boundary malicious trajectories blocked are 230 of 230, and malicious provider reaches are zero.</desc>
+  <rect width="820" height="760" fill="#fff"/>
+  <text x="42" y="44" font-family="Inter,Arial,sans-serif" font-size="23" font-weight="700">Completed mechanism evidence</text>
+  <text x="42" y="72" font-family="Inter,Arial,sans-serif" font-size="15" fill="#5f6368">Frozen 60-task AgentDojo development cohort</text>
+
+  <!-- section 1 -->
+  <text x="42" y="118" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#5f6368" letter-spacing="1">UTILITY / GENERALIZATION</text>
+  <line x1="42" y1="130" x2="778" y2="130" stroke="#d9dadd"/>
+
+  <text x="42" y="173" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="600">Reference executions preserved</text>
+  <rect x="350" y="152" width="340" height="28" fill="#f7f7f5" stroke="#d9dadd"/>
+  <rect x="350" y="152" width="340" height="28" fill="#f5d13a" stroke="#0a0a0a"/>
+  <text x="716" y="173" font-family="ui-monospace,monospace" font-size="16" font-weight="700">60/60</text>
+
+  <text x="42" y="225" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="600">Evidence-consistent counterfactuals</text>
+  <rect x="350" y="204" width="340" height="28" fill="#f7f7f5" stroke="#d9dadd"/>
+  <rect x="350" y="204" width="340" height="28" fill="#f5d13a" stroke="#0a0a0a"/>
+  <text x="716" y="225" font-family="ui-monospace,monospace" font-size="16" font-weight="700">36/36</text>
+
+  <text x="42" y="277" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="600">Exact-trace baseline counterfactuals</text>
+  <rect x="350" y="256" width="340" height="28" fill="#f7f7f5" stroke="#d9dadd"/>
+  <rect x="350" y="256" width="9.4" height="28" fill="#0a0a0a"/>
+  <text x="716" y="277" font-family="ui-monospace,monospace" font-size="16" font-weight="700">1/36</text>
+  <text x="350" y="304" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">Exact trace equality rejects 35 legitimate evidence-consistent variants.</text>
+
+  <!-- section 2 -->
+  <text x="42" y="360" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#5f6368" letter-spacing="1">ADVERSARIAL SAFETY</text>
+  <line x1="42" y1="372" x2="778" y2="372" stroke="#d9dadd"/>
+
+  <text x="42" y="420" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="600">Corrected authorization mutants blocked</text>
+  <rect x="350" y="399" width="340" height="28" fill="#f7f7f5" stroke="#d9dadd"/>
+  <rect x="350" y="399" width="340" height="28" fill="#f5d13a" stroke="#0a0a0a"/>
+  <text x="716" y="420" font-family="ui-monospace,monospace" font-size="16" font-weight="700">370/370</text>
+
+  <text x="42" y="478" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="600">Provider-boundary attacks blocked</text>
+  <rect x="350" y="457" width="340" height="28" fill="#f7f7f5" stroke="#d9dadd"/>
+  <rect x="350" y="457" width="340" height="28" fill="#f5d13a" stroke="#0a0a0a"/>
+  <text x="716" y="478" font-family="ui-monospace,monospace" font-size="16" font-weight="700">230/230</text>
+
+  <rect x="42" y="525" width="736" height="102" fill="#f7f7f5" stroke="#0a0a0a" stroke-width="1.5"/>
+  <text x="70" y="559" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700">Malicious provider reaches</text>
+  <text x="70" y="604" font-family="ui-monospace,monospace" font-size="38" font-weight="700">0</text>
+  <text x="130" y="604" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">of 230 constructible malicious trajectories reached the protected provider callback</text>
+
+  <line x1="42" y1="670" x2="778" y2="670" stroke="#d9dadd"/>
+  <text x="42" y="699" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">Perfect block rates apply to the frozen evaluated attack families; they do not establish arbitrary-task completeness.</text>
+  <text x="42" y="722" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">Reference utility remained 60/60 in every provider-boundary family.</text>
+</svg>

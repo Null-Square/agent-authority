@@ -1,88 +1,118 @@
 # Agent Authority Roadmap
 
-Agent Authority's current bottleneck is **product proof and external validation**, not another authorization subsystem.
+Agent Authority has two tracks:
 
-The product thesis is:
+1. the **product track**, which remains Community / Developer Preview;
+2. the **V1 research track**, which closed on 2026-08-29 and is now a community handoff.
+
+The product thesis remains:
 
 > **Give an agent a task, not standing account permissions.**
 
-The differentiated mechanism is:
+The research contribution sharpens the dynamic-authority problem:
 
-> **Authority may follow task resources discovered through already-authorized execution, without becoming ambient account authority.**
+> **Observation provenance is not selection authority.**
 
-Core invariant:
+## Research V1 — closed
 
-```text
-Task Lease authority <= Mission authority
-```
+The original V1 research project is complete. No additional paid model run is required for closure.
 
-Across delegation, transports and durable state, authority may stay equal or shrink; it must never silently grow.
+Completed:
 
-## Current stage — Community / Developer Preview
+- [x] cover all 60 AgentDojo tasks with protected mutations across Slack, Banking, Workspace, and Travel;
+- [x] preserve 60/60 reference utility in the deterministic cohort;
+- [x] accept 36/36 evidence-consistent counterfactuals while an exact-trace baseline accepts 1/36;
+- [x] block 370/370 corrected adversarial mutants;
+- [x] block 230/230 constructible provider-boundary adversarial trajectories with 0 malicious provider reaches;
+- [x] falsify provenance-only selection authority with a real aggregate-selector case;
+- [x] add deterministic selection witnesses for supported selector classes;
+- [x] freeze the V1 live-evaluation mechanism before the final DeepSeek V4 Pro attempts;
+- [x] preserve and qualify the partial DeepSeek evidence instead of discarding incomplete runs;
+- [x] archive the paid DeepSeek workflow so it executes zero model API calls;
+- [x] make the research reproduction workflow manual and offline;
+- [x] publish paper-facing results, limitations, attempt history, citation metadata, and machine-readable attempt summaries.
 
-The repository has a strong enforcement and evidence foundation. The immediate goal is now to make the product easy enough, measurable enough and transparent enough that outside developers and security researchers can use it, attack it and extend it.
+The full 5,088-run DeepSeek matrix did not pass its zero-execution-error gate. That is a recorded limitation, not an open closure task.
 
-Community Preview does **not** mean production-ready. It means the implementation has enough real workflow proof to justify asking the community for independent evidence.
+See `RESEARCH.md` and `benchmarks/task-contracts/`.
 
-## Community Preview release gate
+## Community research backlog
 
-Repository-controlled gates:
+These are useful next research projects. They are not required to interpret or close V1.
+
+1. **Semantic authority envelopes.** Distinguish user-required constants from bounded values, evidence-derived values, selection-derived values, and incidental execution choices.
+2. **Formal semantics and proofs.** Formalize Mission non-amplification, causal authority provenance, selection soundness, ambiguity fail-closed behavior, and lifecycle/delegation properties.
+3. **Held-out evaluation.** Test on tasks that did not shape the V1 grammar and on newly designed open-world selector benchmarks.
+4. **Baselines and ablations.** Implement comparable authorization approaches and isolate the value of provenance, selection witnesses, cardinality, precedence, correlation, and static fences.
+5. **Independent red team.** Search for direct-path bypasses, request substitution, provenance substitution, selector abuse, stale-evidence attacks, and transport inconsistencies.
+6. **Model diversity.** Evaluate additional model families when the experiment adds scientific value. Do not rerun the historical paid matrix only to fill missing rows.
+7. **Cost measurements.** Measure runtime overhead, policy generation cost, false step-ups, and human approval burden.
+8. **Stronger evidence boundaries.** Study provider-signed or otherwise stronger remote evidence where practical.
+
+## Community Preview product stage
+
+The public package remains a Community / Developer Preview. Research closure does not imply production readiness.
+
+### Established product foundation
 
 - [x] task-first facade over Mission + Task Lease + Guard;
 - [x] `task.run()` for application-owned effects;
 - [x] `task.execute()` for connected-provider effects;
 - [x] strict `task.authorityFrom()` evidence-derived authority;
+- [x] narrow typed relations: `exact`, `oneOf`, `max`;
 - [x] authenticated local durable Task Lease recovery;
 - [x] GitHub connected-provider path with broker-internal credential resolution;
-- [x] coding workflow: issue -> task branch -> exact changed path -> draft PR, with merge outside authority;
-- [x] support/communications proof across Gmail-shaped thread -> exact Calendar-shaped attendee;
-- [x] operations/finance proof across ticket -> order -> payment -> bounded partial refund;
-- [x] narrow typed binding relations: `exact`, `oneOf`, `max`;
-- [x] exact remains backward-compatible default, including recovered snapshots;
-- [x] invalid relation/fact shapes fail closed;
-- [x] external AgentDojo Slack oracle harness pinned to `agentdojo==0.1.35` / `v1.2.2`;
-- [x] selected AgentDojo oracle set maps 5/5 after `oneOf` closes the finite-set gap;
-- [x] selected AgentDojo oracle set preserves 100% legitimate completion, blocks 100% unrelated target attempts and executes 0 unauthorized effects;
-- [x] first-class TypeScript declarations for the task-first package path;
-- [x] Node 20/22 CI, coverage, package checks, CodeQL and connected GitHub validation;
-- [x] security, evidence and contribution docs state the current trust boundary rather than old prototype limits;
-- [ ] final `v0.5.0` package candidate passes all required checks after the version bump;
-- [ ] fresh install of `v0.5.0` is verified from npm after publish.
+- [x] coding workflow proof: issue -> task branch -> exact changed path -> draft PR;
+- [x] support/communications cross-provider proof;
+- [x] operations/finance proof with bounded partial refund;
+- [x] direct SDK, MCP, brokered provider, and protected Vercel AI SDK paths;
+- [x] Node 20/22 CI, coverage, package checks, CodeQL, and connected-provider validation;
+- [x] security documentation that states the enforcement and trust boundary explicitly.
 
-Only the last two items are release mechanics. They should be completed after the feature/docs candidate is fully green.
+### Release mechanics
 
-## External validation gate — what Community Preview is for
+These remain separate from research closure:
 
-These cannot be self-certified by the repository and should remain visibly open:
+- [ ] run the final package candidate checks when CI capacity is available;
+- [ ] publish the intended npm release when release capacity is available;
+- [ ] verify a fresh install from the npm registry after publication.
 
-- [ ] first-time independent developer completes a meaningful integration in under 10 minutes;
-- [ ] at least one external developer keeps Agent Authority in a real agent workflow without project-author assistance;
-- [ ] model-in-the-loop AgentDojo run publishes reproducible official utility/security scores;
-- [ ] execution-effective unauthorized effects are reported separately from attempted model tool calls;
-- [ ] independent security review attempts direct-path bypass, request substitution, provenance substitution and relation abuse;
-- [ ] at least one external contributor lands a useful mapping, integration, adversarial test or benchmark extension.
+Do not block the research handoff or paper on these release mechanics.
 
-Announcement should explicitly invite this work rather than imply it has already happened.
+## Product priorities after research closure
 
-## Narrow typed relations — evidence-driven only
+1. **External onboarding evidence.** Measure time to first protected effect and integration friction.
+2. **Approval-delta UX.** Make genuine authority expansion explicit, understandable, and safely resumable.
+3. **Framework starters driven by demand.** Add integrations only when real users need them.
+4. **TypeScript depth.** Expand declarations where actual consumers use lower-level APIs.
+5. **Production credential lifecycle.** Add OAuth/GitHub App/KMS paths when deployment demand justifies them.
+6. **Remote deployment hardening.** Add multi-tenant and distributed state only for a concrete deployment target.
+7. **Research-to-product transfer.** Promote selection-witness or semantic-envelope ideas only after the public API contract is clear and independently tested.
 
-The current relation vocabulary is deliberately small:
+## Current product relation vocabulary
+
+The public product deliberately keeps a small relation set:
 
 ```text
 exact   request == established fact
-oneOf   request ∈ established finite set
+oneOf   request is one member of an established finite set
 max     numeric request <= established ceiling
 ```
 
 Why each exists:
 
 - `exact` is the original task-resource invariant;
-- `oneOf` was justified by AgentDojo Slack `user_task_11`, which legitimately targets exactly `{general, random}`;
-- `max` was justified by the finance workflow, where a partial refund should be useful while an over-refund remains outside authority.
+- `oneOf` came from the AgentDojo finite-set workflow gap;
+- `max` came from the bounded partial-refund workflow.
 
-Do **not** turn this into a general expression language. Add another typed relation only when a real external workflow or benchmark fails safely first and the smallest new relation closes that exact gap.
+The research prototype contains richer stateful constraints. Do not automatically copy them into the public API.
 
-`max` is per effect, not cumulative accounting. Provider-side state, budgets and idempotency remain authoritative for aggregate totals.
+A new public relation must have:
+
+1. a concrete workflow or external benchmark that fails safely without it;
+2. an adversarial test;
+3. the smallest semantics that solve the observed gap;
+4. a clear explanation of how it preserves the Mission ceiling.
 
 ## Foundation status
 
@@ -90,29 +120,30 @@ Do **not** turn this into a general expression language. Add another typed relat
 
 - Mission validation and explicit deny precedence;
 - allow / deny / require-approval outcomes;
-- resource constraints, expiry and budgets;
+- resource constraints, expiry, and budgets;
 - delegation attenuation and revocation;
-- semantic request receipts / hashes;
+- semantic request receipts and hashes;
 - protocol-neutral guard boundary;
 - one-time approvals and mutation idempotency;
 - encrypted trusted-local-host credential vault;
 - GitHub brokered execution;
-- MCP gateway and harness-managed connector proofs;
-- Node 20/22 CI, coverage, package checks and CodeQL.
+- MCP gateway and harness-managed connector proofs.
 
 ### M1 — Task Lease / task-resource authority: established
 
 - explicit task authority roots;
 - same-Mission / same-lease lineage;
 - evidence-derived facts;
-- `exact`, `oneOf` and `max` bindings;
+- `exact`, `oneOf`, and `max` bindings;
 - unresolved facts fail closed;
 - relation mismatch becomes an authority-delta step-up;
-- Mission remains the ceiling;
-- completion/expiry immediately remove task authority;
-- Task Lease ID/hash retained in receipts.
+- Mission remains the effect ceiling;
+- completion/expiry remove task authority;
+- Task Lease identity is retained in receipts.
 
-### M2 — durable local task execution: established for product proof
+### M2 — durable local task execution: product-proof level
+
+Established:
 
 - authenticated local persistence/recovery;
 - exact Mission-hash binding on recovery;
@@ -122,27 +153,31 @@ Do **not** turn this into a general expression language. Add another typed relat
 - durable completion/expiry;
 - refresh before security-critical evaluation.
 
-Still open because it is not required for Community Preview:
+Open only if product adoption requires it:
 
-- [ ] safe application of an approved authority delta into a live durable task;
+- [ ] safe application of an approved authority delta to a live durable task;
 - [ ] crash-safe remote-effect / durable-state coupling;
 - [ ] stronger multi-process recovery tooling;
-- [ ] remote/distributed persistence only if real adoption requires it.
+- [ ] remote/distributed persistence.
 
-### M3 — trustworthy derived facts: established inside the trusted runtime boundary
+### M3 — trustworthy derived facts: trusted-runtime level
+
+Established:
 
 - reviewed extractor contract;
-- exact output hash / ALLOW receipt / execution-evidence agreement;
+- exact guarded-output / ALLOW-receipt / execution-evidence agreement;
 - caller cannot choose the strict derived value;
 - Google and GitHub conformance fixtures;
-- tamper/replay/cross-lease/wrong-operation/dangerous-selector tests.
+- tamper, replay, cross-lease, wrong-operation, and dangerous-selector tests.
 
-Still open:
+Open:
 
-- [ ] provider-signed or otherwise stronger remote attestation where practical;
-- [ ] source freshness/invalidation semantics where a real workflow requires them.
+- [ ] stronger remote provider attestation where practical;
+- [ ] source freshness and invalidation semantics for workflows that need them.
 
 ### M4 — transport invariance: established on demonstrated paths
+
+Demonstrated paths:
 
 - direct guard/SDK;
 - MCP gateway;
@@ -150,52 +185,25 @@ Still open:
 - task-first `task.execute()`;
 - Vercel AI SDK protected-tool path.
 
-Changing demonstrated transport must not broaden task authority.
-
-## Product / DX priorities after Community Preview
-
-1. **External onboarding evidence.** Measure time-to-first-protected-effect and where developers get stuck.
-2. **Model-in-the-loop AgentDojo.** Keep official benchmark scores separate from execution-effective side effects.
-3. **Approval-delta UX.** Make a genuine authority expansion understandable and safely resumable.
-4. **Framework starters driven by demand.** Prioritize integrations real adopters request, not connector count.
-5. **TypeScript depth.** Expand declarations beyond the task-first surface when actual consumers use lower-level APIs.
-6. **Provider credential lifecycle.** Add production OAuth/GitHub App/KMS paths when adoption justifies them.
-7. **Remote deployment.** Harden multi-tenant/remote state only after there is a concrete deployment target.
-
-## Ecosystem milestone
-
-After repeatable external adoption:
-
-- adapter/extractor conformance starter;
-- good-first-issue tasks tied to proven workflow gaps;
-- independent provider mapping implementation;
-- stable authority-lineage/adversarial test vectors;
-- documentation site only when README/docs navigation is actually limiting;
-- standards mapping only after operational evidence exists.
+Changing transport must not broaden task authority.
 
 ## Freeze list
 
-Unless a real workflow proves one is necessary now:
+Do not build these without concrete evidence that they are needed:
 
-- distributed Task Lease databases;
-- generic persistence abstractions for their own sake;
-- new token or identity formats;
+- generic distributed Task Lease databases;
 - proprietary universal policy DSL;
-- broad OAuth platform work;
+- new identity/token formats;
+- broad connector expansion for its own sake;
 - another MCP control plane;
-- A2A implementation;
-- connector-count expansion for its own sake;
-- dashboard-first enterprise product work;
-- full distributed transactions across arbitrary providers;
-- speculative provider-attestation protocols.
+- dashboard-first enterprise work;
+- speculative provider-attestation protocols;
+- paid benchmark reruns that add no new scientific question.
 
-## Research questions
+## Definition of the current state
 
-1. Can a first-time developer understand and integrate task-first authority in under 10 minutes?
-2. Which real workflows benefit enough from derived authority that ordinary application checks are not sufficient?
-3. Where does Agent Authority create false approvals or reduce legitimate task completion?
-4. Can model-in-the-loop AgentDojo attacks produce execution-effective unauthorized effects behind the gate?
-5. How should an approved authority delta update a running durable task without becoming wildcard authority?
-6. Which source-data changes should invalidate downstream authority in practice?
-7. What remote-effect coupling is actually necessary, and which provider idempotency primitives can be reused?
-8. Which additional relation, if any, is justified by external workflow evidence after `exact`, `oneOf` and `max`?
+**Research:** V1 closed and handed to the community.
+
+**Product:** Community / Developer Preview, with npm release mechanics still separable from the research result.
+
+**Paper:** ready to draft from the frozen research package. The paper must preserve the claim boundaries and incomplete-live-matrix limitation recorded in `PAPER_RESULTS_DRAFT.md`.

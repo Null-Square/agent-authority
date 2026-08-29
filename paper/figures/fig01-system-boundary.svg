@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 620" role="img" aria-labelledby="title desc">
+  <title id="title">Agent Authority system and enforcement boundary</title>
+  <desc id="desc">A compromised agent proposes effects. A reference monitor checks a stateful task contract under a fixed Mission ceiling before any provider mutation. Authorized output returns as execution evidence and may derive new task-local resource authority.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#0a0a0a"/>
+    </marker>
+    <marker id="arrowYellow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#b08b00"/>
+    </marker>
+  </defs>
+  <rect width="1400" height="620" fill="#ffffff"/>
+
+  <text x="60" y="52" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="700" fill="#0a0a0a">System and enforcement boundary</text>
+  <text x="60" y="82" font-family="Inter,Arial,sans-serif" font-size="16" fill="#5f6368">The model may be compromised; protected provider effects are mediated outside model reasoning.</text>
+
+  <!-- Mission ceiling -->
+  <rect x="440" y="106" width="520" height="64" fill="#f5d13a" stroke="#0a0a0a" stroke-width="2"/>
+  <text x="700" y="133" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="700" fill="#0a0a0a">MISSION — fixed effect ceiling</text>
+  <text x="700" y="157" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" fill="#0a0a0a">allowed effect kinds do not expand during the task</text>
+  <path d="M700 170 L700 208" stroke="#0a0a0a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Agent -->
+  <rect x="60" y="220" width="290" height="180" fill="#ffffff" stroke="#0a0a0a" stroke-width="2"/>
+  <rect x="60" y="220" width="290" height="38" fill="#f7f7f5"/>
+  <text x="82" y="246" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700" fill="#0a0a0a">UNTRUSTED AGENT</text>
+  <text x="82" y="294" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="600" fill="#0a0a0a">Reason / plan / call tools</text>
+  <text x="82" y="324" font-family="Inter,Arial,sans-serif" font-size="15" fill="#5f6368">May process injected content</text>
+  <text x="82" y="349" font-family="Inter,Arial,sans-serif" font-size="15" fill="#5f6368">May choose malicious arguments</text>
+  <text x="82" y="374" font-family="Inter,Arial,sans-serif" font-size="15" fill="#5f6368">Not in trusted computing base</text>
+
+  <!-- Reference monitor -->
+  <rect x="470" y="208" width="460" height="208" fill="#ffffff" stroke="#0a0a0a" stroke-width="3"/>
+  <rect x="470" y="208" width="460" height="42" fill="#0a0a0a"/>
+  <text x="492" y="236" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700" fill="#ffffff">REFERENCE MONITOR — trusted boundary</text>
+  <text x="495" y="285" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700" fill="#0a0a0a">Stateful task contract</text>
+  <text x="495" y="314" font-family="Inter,Arial,sans-serif" font-size="15" fill="#5f6368">roots · evidence bindings · tuple correlation</text>
+  <text x="495" y="339" font-family="Inter,Arial,sans-serif" font-size="15" fill="#5f6368">cardinality · precedence · selection witnesses</text>
+  <line x1="495" y1="360" x2="905" y2="360" stroke="#d9dadd" stroke-width="1.5"/>
+  <text x="495" y="392" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#0a0a0a">ALLOW  |  STEP-UP  |  DENY</text>
+
+  <!-- Provider -->
+  <rect x="1050" y="220" width="290" height="180" fill="#ffffff" stroke="#0a0a0a" stroke-width="2"/>
+  <rect x="1050" y="220" width="290" height="38" fill="#f7f7f5"/>
+  <text x="1072" y="246" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700" fill="#0a0a0a">PROVIDER</text>
+  <text x="1072" y="294" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="600" fill="#0a0a0a">Protected side effect</text>
+  <text x="1072" y="324" font-family="Inter,Arial,sans-serif" font-size="15" fill="#5f6368">send · mutate · refund · create</text>
+  <text x="1072" y="358" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700" fill="#0a0a0a">Executes only after ALLOW</text>
+
+  <!-- Requests and provider path -->
+  <path d="M350 294 L468 294" stroke="#0a0a0a" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="409" y="280" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" fill="#5f6368">effect request</text>
+
+  <path d="M930 294 L1048 294" stroke="#b08b00" stroke-width="4" marker-end="url(#arrowYellow)"/>
+  <text x="989" y="279" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="700" fill="#7d6500">ALLOW</text>
+
+  <path d="M930 352 L1010 352" stroke="#0a0a0a" stroke-width="2" stroke-dasharray="8 7"/>
+  <line x1="1018" y1="339" x2="1038" y2="365" stroke="#0a0a0a" stroke-width="3"/>
+  <line x1="1038" y1="339" x2="1018" y2="365" stroke="#0a0a0a" stroke-width="3"/>
+  <text x="984" y="379" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" fill="#5f6368">DENY / STEP-UP → no callback</text>
+
+  <!-- Authority state -->
+  <rect x="360" y="476" width="680" height="92" fill="#f7f7f5" stroke="#8f9297" stroke-width="1.5"/>
+  <rect x="360" y="476" width="12" height="92" fill="#f5d13a"/>
+  <text x="394" y="508" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700" fill="#0a0a0a">TASK-LOCAL RESOURCE AUTHORITY  A<tspan baseline-shift="sub" font-size="12">t</tspan></text>
+  <text x="394" y="537" font-family="Inter,Arial,sans-serif" font-size="15" fill="#5f6368">Concrete resource facts may grow from trusted roots, authorized evidence, or a valid selection witness.</text>
+  <text x="394" y="558" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" fill="#0a0a0a">Effects(A<tspan baseline-shift="sub" font-size="10">t</tspan>) ⊆ Mission</text>
+
+  <!-- Evidence loop -->
+  <path d="M1195 400 L1195 452 L1040 452 L1040 510" fill="none" stroke="#0a0a0a" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1117" y="442" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" fill="#5f6368">output + execution evidence</text>
+  <path d="M700 476 L700 417" fill="none" stroke="#b08b00" stroke-width="3" marker-end="url(#arrowYellow)"/>
+  <text x="718" y="451" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" fill="#7d6500">current state</text>
+
+  <!-- Scope marker -->
+  <line x1="1018" y1="190" x2="1018" y2="430" stroke="#8f9297" stroke-width="1.5" stroke-dasharray="5 6"/>
+  <text x="1027" y="206" font-family="Inter,Arial,sans-serif" font-size="12" fill="#5f6368">provider-effect boundary</text>
+
+  <text x="60" y="600" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">Security claim: containment applies only to protected provider paths mediated by this boundary.</text>
+</svg>

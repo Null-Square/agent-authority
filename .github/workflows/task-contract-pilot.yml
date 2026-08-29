@@ -1,21 +1,13 @@
-name: Task Contract Research Pilot
+name: Task Authority Research Reproduction (Offline)
 
 on:
-  push:
-    branches:
-      - research/task-contract-pilot
-    paths:
-      - "benchmarks/task-contracts/**"
-      - "benchmarks/agentdojo/requirements.txt"
-      - ".github/workflows/task-contract-pilot.yml"
-      - ".github/workflows/task-contract-live-deepseek.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  pilot:
+  reproduce:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -32,36 +24,26 @@ jobs:
       - name: Install AgentDojo research dependency
         run: python -m pip install -r benchmarks/agentdojo/requirements.txt
 
-      - name: Verify frozen V1 live-evaluation mechanism
+      - name: Verify frozen V1 mechanism
         run: |
           python benchmarks/task-contracts/validate-mechanism-freeze.py \
             benchmarks/task-contracts/live-eval-freeze.json \
             > /tmp/live-eval-freeze-validation.json
 
-      - name: Compile live-evaluation tooling
-        run: |
-          python -m py_compile \
-            benchmarks/task-contracts/deepseek-publication-eval.py \
-            benchmarks/task-contracts/run-deepseek-publication-eval.py \
-            benchmarks/task-contracts/aggregate-deepseek-publication-eval.py \
-            benchmarks/task-contracts/validate-mechanism-freeze.py
-
-      - name: Audit prompt/trace oracle consistency
+      - name: Audit AgentDojo prompt and trace consistency
         run: python benchmarks/task-contracts/audit-agentdojo-oracle-consistency.py > /tmp/agentdojo-oracle-consistency.json
 
-      - name: Survey all AgentDojo user tasks
-        run: python benchmarks/task-contracts/survey-agentdojo-coverage.py > /tmp/agentdojo-coverage-survey.json
+      - name: Build frozen 60-task cohort
+        run: |
+          python benchmarks/task-contracts/survey-agentdojo-coverage.py > /tmp/agentdojo-coverage-survey.json
+          node benchmarks/task-contracts/build-agentdojo-expanded-cohort.mjs \
+            /tmp/agentdojo-coverage-survey.json \
+            /tmp/agentdojo-expanded-cohort.json
+          node benchmarks/task-contracts/emit-strict-contracts.mjs \
+            /tmp/agentdojo-expanded-cohort.json \
+            /tmp/task-contract-runtime-bundle.json
 
-      - name: Summarize full-suite authority coverage
-        run: node benchmarks/task-contracts/summarize-agentdojo-coverage.mjs /tmp/agentdojo-coverage-survey.json > /tmp/agentdojo-coverage-summary.json
-
-      - name: Build unbiased schema-covered cohort
-        run: node benchmarks/task-contracts/build-agentdojo-expanded-cohort.mjs /tmp/agentdojo-coverage-survey.json /tmp/agentdojo-expanded-cohort.json
-
-      - name: Emit strict runtime contracts with aggregate witnesses
-        run: node benchmarks/task-contracts/emit-strict-contracts.mjs /tmp/agentdojo-expanded-cohort.json /tmp/task-contract-runtime-bundle.json
-
-      - name: Materialize publication live-evaluation plan without API calls
+      - name: Materialize the frozen live plan without API calls
         run: |
           python benchmarks/task-contracts/run-deepseek-publication-eval.py \
             --contracts /tmp/task-contract-runtime-bundle.json \
@@ -70,24 +52,23 @@ jobs:
             --trial 0 \
             --output /tmp/live-eval-plan.json
 
-      - name: Run legacy strict compiler diagnostics on expanded cohort
+      - name: Run corrected strict contract gate
         run: |
           set +e
           set -o pipefail
-          node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs /tmp/agentdojo-expanded-cohort.json | tee /tmp/task-contract-strict-expanded.json
+          node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs \
+            /tmp/agentdojo-expanded-cohort.json | tee /tmp/task-contract-strict-expanded.json
           status=${PIPESTATUS[0]}
           set -e
           if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
             exit "$status"
           fi
 
-      - name: Run aggregate-frequency selector generalization gate
-        run: node benchmarks/task-contracts/run-aggregate-selector-pilot.mjs > /tmp/task-contract-aggregate-selector.json
-
-      - name: Run exact full-action-tuple transplant audit
+      - name: Run exact transplant audit
         run: |
-          set -o pipefail
-          node benchmarks/task-contracts/run-exact-transplant-audit.mjs /tmp/agentdojo-expanded-cohort.json | tee /tmp/task-contract-exact-transplants.json
+          node benchmarks/task-contracts/run-exact-transplant-audit.mjs \
+            /tmp/agentdojo-expanded-cohort.json \
+            > /tmp/task-contract-exact-transplants.json
 
       - name: Validate corrected 60-task strict gate
         run: |
@@ -96,20 +77,22 @@ jobs:
             /tmp/task-contract-exact-transplants.json \
             > /tmp/task-contract-strict-expanded-validated.json
 
-      - name: Run compromised-agent provider-boundary gate
-        run: python benchmarks/task-contracts/model_loop_gate_identity_adversary_with_aggregate.py --contracts /tmp/task-contract-runtime-bundle.json --mode deterministic > /tmp/task-contract-provider-boundary.json
-
-      - name: Stress provider boundary including aggregate wrong-winner attacks
+      - name: Run deterministic provider-boundary families
         run: |
-          set -o pipefail
-          python benchmarks/task-contracts/provider_attack_family_gate_with_aggregate.py --contracts /tmp/task-contract-runtime-bundle.json | tee /tmp/task-contract-provider-families.json
+          python benchmarks/task-contracts/model_loop_gate_identity_adversary_with_aggregate.py \
+            --contracts /tmp/task-contract-runtime-bundle.json \
+            --mode deterministic \
+            > /tmp/task-contract-provider-boundary.json
 
-      - name: Prove aggregate selection witnesses at provider boundary
-        run: |
-          set -o pipefail
-          python benchmarks/task-contracts/aggregate_provider_gate.py --contracts /tmp/task-contract-runtime-bundle.json | tee /tmp/task-contract-aggregate-provider.json
+          python benchmarks/task-contracts/provider_attack_family_gate_with_aggregate.py \
+            --contracts /tmp/task-contract-runtime-bundle.json \
+            > /tmp/task-contract-provider-families.json
 
-      - name: Require perfect provider-boundary safety and utility
+          python benchmarks/task-contracts/aggregate_provider_gate.py \
+            --contracts /tmp/task-contract-runtime-bundle.json \
+            > /tmp/task-contract-aggregate-provider.json
+
+      - name: Require provider-boundary safety and utility gates
         run: |
           node benchmarks/task-contracts/validate-provider-perfect.mjs \
             /tmp/task-contract-provider-boundary.json \
@@ -117,69 +100,32 @@ jobs:
             /tmp/task-contract-aggregate-provider.json \
             > /tmp/task-contract-provider-perfect.json
 
-      - name: Run optional OpenAI AgentDojo model arm
-        continue-on-error: true
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          AGENTDOJO_MODEL: gpt-4o-mini-2024-07-18
-        run: python benchmarks/task-contracts/model_loop_gate_with_aggregate.py --contracts /tmp/task-contract-runtime-bundle.json --mode real > /tmp/task-contract-real-model.json
-
-      - name: Extract and execute pilot directly from AgentDojo
-        run: python benchmarks/task-contracts/extract-agentdojo-pilot.py > /tmp/agentdojo-task-contract-pilot.json
-
-      - name: Validate direct AgentDojo projection
-        run: node benchmarks/task-contracts/validate-agentdojo-projection.mjs /tmp/agentdojo-task-contract-pilot.json
-
-      - name: Recover lineage from authorized execution evidence
-        run: node benchmarks/task-contracts/analyze-automatic-lineage.mjs /tmp/agentdojo-task-contract-pilot.json > /tmp/task-contract-lineage.json
-
-      - name: Diagnose automatic contract safety misses
-        run: node benchmarks/task-contracts/diagnose-automatic-contract.mjs /tmp/agentdojo-task-contract-pilot.json > /tmp/task-contract-diagnostics.json
-
-      - name: Run annotation-free automatic contract gate
-        run: node benchmarks/task-contracts/run-automatic-contract-pilot.mjs /tmp/agentdojo-task-contract-pilot.json > /tmp/task-contract-automatic.json
-
-      - name: Run strict output-or-selection-witness gate
-        run: node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs /tmp/agentdojo-task-contract-pilot.json > /tmp/task-contract-strict.json
-
-      - name: Run selector-witness generalization gate
-        run: node benchmarks/task-contracts/run-selector-witness-pilot.mjs > /tmp/task-contract-selector-witness.json
-
-      - name: Run annotated stateful reference pilot
-        run: node benchmarks/task-contracts/run-pilot.mjs > /tmp/task-contract-reference.json
-
-      - name: Build compact research checkpoint
+      - name: Run selection-witness generalization gates
         run: |
-          node benchmarks/task-contracts/summarize-checkpoint.mjs \
-            /tmp/task-contract-lineage.json \
-            /tmp/task-contract-automatic.json \
-            /tmp/task-contract-reference.json \
-            /tmp/task-contract-checkpoint.json
+          node benchmarks/task-contracts/run-aggregate-selector-pilot.mjs \
+            > /tmp/task-contract-aggregate-selector.json
+          node benchmarks/task-contracts/run-selector-witness-pilot.mjs \
+            > /tmp/task-contract-selector-witness.json
 
-      - name: Upload research checkpoint
+      - name: Upload offline reproduction checkpoint
         uses: actions/upload-artifact@v4
         with:
-          name: task-contract-checkpoint
+          name: task-authority-research-offline-checkpoint
           path: |
-            /tmp/task-contract-checkpoint.json
-            /tmp/task-contract-diagnostics.json
-            /tmp/task-contract-strict.json
-            /tmp/task-contract-strict-expanded.json
-            /tmp/task-contract-strict-expanded-validated.json
-            /tmp/task-contract-exact-transplants.json
-            /tmp/task-contract-aggregate-selector.json
-            /tmp/task-contract-selector-witness.json
-            /tmp/task-contract-provider-boundary.json
-            /tmp/task-contract-provider-families.json
-            /tmp/task-contract-aggregate-provider.json
-            /tmp/task-contract-provider-perfect.json
-            /tmp/task-contract-real-model.json
-            /tmp/task-contract-runtime-bundle.json
             /tmp/live-eval-freeze-validation.json
             /tmp/live-eval-plan.json
             /tmp/agentdojo-oracle-consistency.json
             /tmp/agentdojo-coverage-survey.json
-            /tmp/agentdojo-coverage-summary.json
             /tmp/agentdojo-expanded-cohort.json
+            /tmp/task-contract-runtime-bundle.json
+            /tmp/task-contract-strict-expanded.json
+            /tmp/task-contract-strict-expanded-validated.json
+            /tmp/task-contract-exact-transplants.json
+            /tmp/task-contract-provider-boundary.json
+            /tmp/task-contract-provider-families.json
+            /tmp/task-contract-aggregate-provider.json
+            /tmp/task-contract-provider-perfect.json
+            /tmp/task-contract-aggregate-selector.json
+            /tmp/task-contract-selector-witness.json
           if-no-files-found: error
           retention-days: 30

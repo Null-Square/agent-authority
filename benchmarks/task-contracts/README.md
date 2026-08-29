@@ -4,7 +4,7 @@ Status: **closed V1 research artifact**
 
 Closed: **2026-08-29**
 
-This directory contains the full research prototype, evaluation harness, frozen protocol, attempt history, and preserved paid-model artifacts for the Agent Authority V1 research slice.
+This directory contains the research prototype, evaluation harness, frozen protocol, attempt history, and preserved result summaries for the Agent Authority V1 research slice.
 
 The code is intentionally separate from the product runtime. Do not assume that every research relation or compiler rule is part of the public npm package.
 
@@ -92,25 +92,18 @@ Attempt 3 is supplementary because its adaptive arm failed at YAML parsing befor
 
 The directory also keeps earlier pilots, diagnostics, and generators. They show how the mechanism changed when earlier hypotheses failed. Do not delete them merely because later gates supersede them.
 
-## Permanent paid-artifact archive
+## Paid-evidence preservation
 
-The exact GitHub Actions aggregate artifacts are committed here:
+The repository permanently stores compact machine-readable summaries:
 
 ```text
-artifacts/deepseek-attempt-3.zip
-artifacts/deepseek-attempt-4.zip
+artifacts/attempt-3-summary.json
+artifacts/attempt-4-summary.json
 ```
 
-Each archive contains:
+`ARTIFACT_MANIFEST.md` records the original GitHub Actions run IDs, artifact IDs, exact SHA-256 digests, head SHAs, archive layout, and interpretation rules.
 
-- `live-eval-result.json`;
-- frozen input validation;
-- the planned matrix metadata;
-- all 48 live shard JSON files.
-
-The committed ZIP bytes match the original GitHub Actions SHA-256 digests. See `ARTIFACT_MANIFEST.md`.
-
-This archive exists because GitHub Actions artifacts are temporary.
+The original raw ZIP artifacts contained the aggregate result, frozen inputs, and all 48 shard JSON files for each attempt. They are identified by immutable artifact metadata in the manifest. The repository does not claim that the binary ZIP bytes are stored in Git history.
 
 ## Reproduce without paid APIs
 
@@ -192,7 +185,7 @@ Read in this order:
 3. `PAPER_RESULTS_DRAFT.md` — paper-facing live result and claim language;
 4. `LIVE_EVAL_PROTOCOL.md` — planned frozen DeepSeek protocol;
 5. `LIVE_EVAL_ATTEMPTS.md` — infrastructure and budget failure history;
-6. `ARTIFACT_MANIFEST.md` — immutable raw artifact mapping.
+6. `ARTIFACT_MANIFEST.md` — immutable raw-artifact identifiers and compact summary map.
 
 ## Known limitations
 

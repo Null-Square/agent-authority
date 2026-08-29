@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 650" role="img" aria-labelledby="title desc">
+  <title id="title">Evaluation methodology and evidence layers</title>
+  <desc id="desc">The frozen 60-task AgentDojo cohort feeds contract synthesis and utility tests, then deterministic mutants and provider-boundary attack families. A separately frozen DeepSeek live protocol produces a partial matched Slack slice. Completed and partial evidence are visibly separated.</desc>
+  <defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#0a0a0a"/></marker></defs>
+  <rect width="1440" height="650" fill="#fff"/>
+  <text x="54" y="50" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="700">Evaluation methodology</text>
+  <text x="54" y="80" font-family="Inter,Arial,sans-serif" font-size="16" fill="#5f6368">Three complete mechanism layers plus one explicitly partial live-model layer.</text>
+
+  <text x="54" y="126" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#5f6368" letter-spacing="1.2">COMPLETE DEVELOPMENT-DOMAIN EVIDENCE</text>
+  <line x1="54" y1="138" x2="1035" y2="138" stroke="#0a0a0a" stroke-width="2"/>
+
+  <!-- Stage 1 -->
+  <rect x="54" y="166" width="280" height="254" fill="#fff" stroke="#0a0a0a" stroke-width="2"/>
+  <rect x="54" y="166" width="12" height="254" fill="#f5d13a"/>
+  <text x="88" y="202" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700">1. Frozen cohort</text>
+  <text x="88" y="232" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">AgentDojo 0.1.35</text>
+  <text x="88" y="254" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">benchmark v1.2.2</text>
+  <text x="88" y="286" font-family="ui-monospace,monospace" font-size="15" font-weight="700">60 mutation tasks</text>
+  <text x="88" y="314" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">Slack · Banking</text>
+  <text x="88" y="336" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">Workspace · Travel</text>
+  <line x1="88" y1="360" x2="304" y2="360" stroke="#d9dadd"/>
+  <text x="88" y="389" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">Cohort helped shape grammar;</text>
+  <text x="88" y="409" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">not held-out generalization.</text>
+
+  <!-- Stage 2 -->
+  <rect x="385" y="166" width="280" height="254" fill="#fff" stroke="#0a0a0a" stroke-width="2"/>
+  <text x="417" y="202" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700">2. Contract + utility</text>
+  <text x="417" y="236" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">compile task roots, effects,</text>
+  <text x="417" y="258" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">evidence, state constraints</text>
+  <text x="417" y="296" font-family="ui-monospace,monospace" font-size="15" font-weight="700">60/60 reference</text>
+  <text x="417" y="324" font-family="ui-monospace,monospace" font-size="15" font-weight="700">36/36 counterfactual</text>
+  <text x="417" y="352" font-family="ui-monospace,monospace" font-size="15">1/36 exact-trace baseline</text>
+  <line x1="417" y1="374" x2="635" y2="374" stroke="#d9dadd"/>
+  <text x="417" y="401" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">Tests useful generalization</text>
+  <text x="417" y="419" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">without wildcard authority.</text>
+
+  <!-- Stage 3 -->
+  <rect x="716" y="166" width="319" height="254" fill="#fff" stroke="#0a0a0a" stroke-width="2"/>
+  <text x="748" y="202" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700">3. Adversarial execution</text>
+  <text x="748" y="236" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">corrected offline mutants</text>
+  <text x="748" y="262" font-family="ui-monospace,monospace" font-size="15" font-weight="700">370/370 blocked</text>
+  <text x="748" y="306" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">attempt-exact provider attacks</text>
+  <text x="748" y="332" font-family="ui-monospace,monospace" font-size="15" font-weight="700">230/230 blocked</text>
+  <text x="748" y="360" font-family="ui-monospace,monospace" font-size="15" font-weight="700">0 malicious provider reaches</text>
+  <line x1="748" y1="382" x2="1003" y2="382" stroke="#d9dadd"/>
+  <text x="748" y="409" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">Reference utility rechecked</text>
+  <text x="748" y="427" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">for every attack family.</text>
+
+  <path d="M334 292 L383 292" stroke="#0a0a0a" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M665 292 L714 292" stroke="#0a0a0a" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- Partial layer -->
+  <text x="1090" y="126" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#5f6368" letter-spacing="1.2">PARTIAL LIVE EVIDENCE</text>
+  <line x1="1090" y1="138" x2="1386" y2="138" stroke="#8f9297" stroke-width="2" stroke-dasharray="7 5"/>
+  <rect x="1090" y="166" width="296" height="254" fill="#f7f7f5" stroke="#8f9297" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="1122" y="202" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700">4. DeepSeek V4 Pro</text>
+  <text x="1122" y="234" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">frozen planned matrix</text>
+  <text x="1122" y="260" font-family="ui-monospace,monospace" font-size="15">5,088 planned</text>
+  <text x="1122" y="290" font-family="ui-monospace,monospace" font-size="15" font-weight="700">860 successful</text>
+  <text x="1122" y="316" font-family="ui-monospace,monospace" font-size="15">4,228 balance failures</text>
+  <text x="1122" y="348" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="700">Matched attacked slice</text>
+  <text x="1122" y="374" font-family="ui-monospace,monospace" font-size="15" font-weight="700">372 paired scenarios</text>
+  <text x="1122" y="400" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">Slack only; missingness non-random.</text>
+
+  <path d="M1035 292 L1088 292" stroke="#8f9297" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a)"/>
+
+  <!-- Metrics row -->
+  <rect x="54" y="474" width="1332" height="116" fill="#f7f7f5" stroke="#d9dadd" stroke-width="1.5"/>
+  <text x="82" y="508" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">Primary mechanism metric</text>
+  <text x="82" y="536" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">successful policy-unauthorized protected provider effects</text>
+
+  <line x1="535" y1="493" x2="535" y2="570" stroke="#d9dadd"/>
+  <text x="563" y="508" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">Utility</text>
+  <text x="563" y="536" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">reference completion + matched live task utility</text>
+
+  <line x1="930" y1="493" x2="930" y2="570" stroke="#d9dadd"/>
+  <text x="958" y="508" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">Live statistics</text>
+  <text x="958" y="536" font-family="Inter,Arial,sans-serif" font-size="14" fill="#5f6368">paired scenario comparison; exploratory only</text>
+  <text x="958" y="558" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">Do not infer a four-suite V4 Pro population rate.</text>
+
+  <text x="54" y="626" font-family="Inter,Arial,sans-serif" font-size="13" fill="#8a8d91">The dashed live layer failed the preregistered zero-error completion gate; it is retained as qualified evidence, not rewritten as a completed primary experiment.</text>
+</svg>

@@ -1,0 +1,42 @@
+:root {
+  --paper: #ffffff;
+  --ink: #0a0a0a;
+  --muted: #5f6368;
+  --quiet: #8a8d91;
+  --line: #d9dadd;
+  --line-strong: #8f9297;
+  --signal: #f5d13a;
+  --blocked: #e5484d;
+  --ok: #2fb27a;
+  --panel: #f7f7f5;
+}
+
+html, body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Inter, Arial, Helvetica, sans-serif;
+}
+
+.figure-page {
+  width: min(1400px, 100vw);
+  margin: 0 auto;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.figure-page object,
+.figure-page svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.note {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* Academic figure law: flat geometry, no gradients, no shadows, no rounded cards. */

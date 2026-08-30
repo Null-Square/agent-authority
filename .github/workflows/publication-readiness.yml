@@ -1,0 +1,104 @@
+name: Publication Readiness (Offline)
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/task-contracts/**"
+      - ".github/workflows/publication-readiness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publication-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install AgentDojo research dependency
+        run: python -m pip install -r benchmarks/agentdojo/requirements.txt
+
+      - name: Syntax-check publication extension
+        run: |
+          node --check benchmarks/task-contracts/publication-policies.mjs
+          node --check benchmarks/task-contracts/run-publication-baselines.mjs
+          node --check benchmarks/task-contracts/run-publication-heldout.mjs
+          node --check benchmarks/task-contracts/benchmark-publication-overhead.mjs
+
+      - name: Verify frozen V1 mechanism
+        run: |
+          python benchmarks/task-contracts/validate-mechanism-freeze.py \
+            benchmarks/task-contracts/live-eval-freeze.json \
+            > /tmp/live-eval-freeze-validation.json
+
+      - name: Build frozen 60-task cohort
+        run: |
+          python benchmarks/task-contracts/survey-agentdojo-coverage.py > /tmp/agentdojo-coverage-survey.json
+          node benchmarks/task-contracts/build-agentdojo-expanded-cohort.mjs \
+            /tmp/agentdojo-coverage-survey.json \
+            /tmp/agentdojo-expanded-cohort.json
+
+      - name: Re-run frozen strict gate
+        run: |
+          set +e
+          set -o pipefail
+          node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs \
+            /tmp/agentdojo-expanded-cohort.json | tee /tmp/task-contract-strict-expanded.json
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
+
+          node benchmarks/task-contracts/run-exact-transplant-audit.mjs \
+            /tmp/agentdojo-expanded-cohort.json \
+            > /tmp/task-contract-exact-transplants.json
+
+          node benchmarks/task-contracts/validate-expanded-strict-gate.mjs \
+            /tmp/task-contract-strict-expanded.json \
+            /tmp/task-contract-exact-transplants.json \
+            > /tmp/task-contract-strict-expanded-validated.json
+
+      - name: Run publication baseline and ablation matrix
+        run: |
+          node benchmarks/task-contracts/run-publication-baselines.mjs \
+            /tmp/agentdojo-expanded-cohort.json \
+            > /tmp/publication-baselines.json
+
+      - name: Run post-freeze held-out stress suite
+        run: |
+          node benchmarks/task-contracts/run-publication-heldout.mjs \
+            > /tmp/publication-heldout.json
+
+      - name: Benchmark authorization decision overhead
+        run: |
+          node benchmarks/task-contracts/benchmark-publication-overhead.mjs \
+            /tmp/agentdojo-expanded-cohort.json 200 \
+            > /tmp/publication-overhead.json
+
+      - name: Upload publication checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: publication-readiness-offline-checkpoint
+          path: |
+            /tmp/live-eval-freeze-validation.json
+            /tmp/agentdojo-coverage-survey.json
+            /tmp/agentdojo-expanded-cohort.json
+            /tmp/task-contract-strict-expanded.json
+            /tmp/task-contract-strict-expanded-validated.json
+            /tmp/task-contract-exact-transplants.json
+            /tmp/publication-baselines.json
+            /tmp/publication-heldout.json
+            /tmp/publication-overhead.json
+          if-no-files-found: error
+          retention-days: 30

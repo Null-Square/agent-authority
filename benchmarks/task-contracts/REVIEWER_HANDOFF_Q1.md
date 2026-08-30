@@ -1,4 +1,4 @@
-# Q1 Reviewer Handoff — Agent Authority Publication Extension
+# Q1 Reviewer Handoff — Agent Authority
 
 Date: **2026-08-30**
 
@@ -6,133 +6,111 @@ Branch: `research/q1-publication-readiness`
 
 Pull request: **#53 — research: strengthen Q1 publication evidence for selection authority**
 
-## Review instruction
+## Primary review target
 
-Please review this package as a skeptical security/agent-systems journal reviewer. The goal is not to confirm the authors' interpretation. Try to identify a reason the central claim, proof, comparator design, evaluation, or novelty argument would fail peer review.
+Read **`MANUSCRIPT_Q1.md` first** and review it as a skeptical security/agent-systems journal submission. Use the supporting files only to verify claims, proofs, and reproducibility.
 
-The question to answer at the end is:
+The decision question is:
 
-> Is this evidence package ready to support drafting/submission of a strong Q1-level paper centered on selection authority, and if not, what is the smallest concrete set of missing work?
+> Does the manuscript make a clear, technically non-trivial, reproducible contribution by treating selection over authorized runtime evidence as a first-class resource authorization relation?
 
-## Central claim to attack
+## Central claim
 
-> Observation provenance is not selection authority. When authorized execution reveals multiple legitimate candidate resources, a later protected effect on one candidate requires evidence that the task predicate selects that candidate; candidate membership alone is insufficient. Agent Authority realizes this with deterministic selection witnesses under a fixed Mission/effect ceiling.
+> **Authorized observation is not selection authority.** When legitimate execution reveals several candidate resources, provenance can establish that every candidate came from an authorized path without establishing which candidate the user's task selected for a protected effect. Agent Authority requires a deterministic witness for that task selection relation before the selected resource gains dynamic authority.
 
-The claim is deliberately narrower than general prompt-injection prevention, least privilege, capability security, task alignment, or provenance security.
+The August 2026 literature check matters here. SARA already separates action induction from runtime execution authorization. The manuscript therefore does **not** claim the generic provenance-versus-authorization distinction as novel. The review should focus on the narrower candidate-selection relation represented by `S(P,C,E)`.
 
-## Files to review first
+## Review order
 
-1. `PUBLICATION_RESULTS.md` — exact new quantitative results and limitations.
-2. `FORMAL_MODEL.md` — operational semantics, assumptions, and proofs.
-3. `PUBLICATION_PROTOCOL.md` — freeze boundary, comparator definitions, held-out methodology, and claim hierarchy.
-4. `RELATED_WORK_Q1.md` — closest-work novelty audit.
-5. `publication-policies.mjs` — executable comparator semantics.
-6. `run-publication-baselines-v2.mjs` — primary development-cohort comparison gate.
-7. `run-publication-heldout.mjs` — isolated post-freeze task/ablation suite.
-8. `.github/workflows/publication-readiness.yml` — complete offline reproduction gate.
-9. Existing V1 `PAPER_RESULTS_DRAFT.md`, `PAPER_RESEARCH_SPEC.md`, and `RESEARCH.md` — historical evidence/claim boundary.
+1. `MANUSCRIPT_Q1.md` — complete paper narrative, figures, tables, and references.
+2. `PUBLICATION_RESULTS.md` — exact quantitative record.
+3. `FORMAL_MODEL.md` — operational semantics and full proof development.
+4. `PUBLICATION_PROTOCOL.md` — freeze and evaluation protocol.
+5. `RELATED_WORK_Q1.md` — closest-work audit, including SARA and the July 2026 provenance-sensitivity study.
+6. `publication-policies.mjs` — executable comparator semantics.
+7. `run-publication-baselines-v2.mjs` — primary comparison gate.
+8. `run-publication-heldout.mjs` — post-freeze stress and isolated ablations.
+9. `.github/workflows/publication-readiness.yml` — reproduction gate.
 
-## Reproduction checkpoint
+## Results that should be checked against the implementation
 
-Successful publication workflow:
-
-- run: `33324959812`;
-- validated commit: `cbe6f1077fc3a570e5d625f267005f52a7239fb9`;
-- artifact ID: `9735953563`;
-- artifact SHA-256: `bc53e9cf0ea94d458426a1b5d1732820c2fb11e08d9a8ee47b3438926a175ded`.
-
-The checkpoint contains the rebuilt 60-task cohort, freeze validation, original strict result, exact-transplant audit, publication baseline matrix, post-freeze held-out result, and CPU overhead result.
-
-A subsequent documentation-only commit may retrigger CI; use the latest green publication workflow when one exists, but the quantitative results above correspond to the immutable checkpoint identified here.
-
-## Results that must survive review
-
-### Development cohort
+### Main cohort
 
 - full Agent Authority: **96/96 legitimate accepted, 385/385 publication-primary attacks blocked**;
-- standing action authority: 96/96 legitimate, 60/385 attacks blocked;
-- output provenance without selection witnesses: 96/96 legitimate, 383/385 blocked, but **2/2 wrong observed candidates authorized**;
-- request/output provenance: 96/96 legitimate, 337/385 blocked, including **46/46 request self-authorization probes authorized**;
-- single-trace field-wise value allowlist: **61/96** legitimate and 252/385 attacks blocked; among changed-evidence counterfactuals it accepts **1/36**.
+- standing action authority: 96/96 legitimate, 60/385 blocked;
+- output provenance without selection witnesses: **96/96 legitimate**, 383/385 blocked, with **2/2 wrong observed selector candidates authorized**;
+- request/output provenance: 96/96 legitimate, 337/385 blocked, with **46/46 request self-authorization probes authorized**;
+- single-trace field-wise value allowlist: 61/96 legitimate, 252/385 blocked, including only 1/36 changed-evidence executions accepted.
 
 ### Structural ablations
 
-- remove cardinality: 60/60 repeat mutants become authorized;
-- remove precedence: 24/59 reorder mutants become authorized;
-- remove tuple relation: 12/12 cross-product mutants become authorized;
-- unrestricted dynamic fields authorize 48 field mutants, 46/46 self-authorization probes, and 2/2 wrong-selector probes.
+- no cardinality: 60/60 repeated effects become authorized;
+- no precedence: 24/59 reorder mutants become authorized;
+- no tuple relation: 12/12 cross-product tuples become authorized;
+- request provenance: 46/46 self-authorization probes become authorized;
+- output provenance without selection: 2/2 wrong observed candidates become authorized.
 
-### Post-freeze suite
-
-Eight author-generated task structures, frozen mechanism unchanged:
+### Post-freeze task structures
 
 - full Agent Authority: **13/13 legitimate accepted, 13/13 attacks blocked**;
 - output provenance: 13/13 legitimate, 7/13 attacks blocked;
 - request/output provenance: 13/13 legitimate, 6/13 blocked;
-- one-feature structural ablations each expose their isolated intended attack;
-- single-trace field-wise allowlist: 8/13 legitimate, 6/13 blocked.
+- isolated one-feature ablations expose the intended selection, cardinality, precedence, and tuple cases.
 
-### Existing provider/live evidence
+### Provider boundary and live case study
 
-- corrected V1 deterministic mutants: **370/370 blocked**;
-- provider-boundary trajectories: **230/230 blocked, 0 malicious provider reaches**;
-- partial DeepSeek V4 Pro Slack case study: 372 matched attacked scenarios; ungated 61 unauthorized protected effects across 40 scenarios; gated 0; utility difference 2.15 pp.
+- provider-boundary malicious trajectories: **230/230 blocked**;
+- malicious provider reaches: **0**;
+- matched DeepSeek V4 Pro Slack case study: 372 attacked scenarios; ungated execution produces 61 policy-unauthorized protected effects across 40 scenarios; gated execution produces 0.
 
-## Questions the reviewer should answer explicitly
+### Performance
 
-1. **Novelty.** Does the candidate/selection distinction remain novel and non-trivial after comparing against CaMeL, MiniScope, Task Shield, Agent-Sentry, RACG/ContractGuard, capabilities, information-flow control, and classic authorization concepts? If not, identify the closest prior construction and the exact overlap.
+- median decision CPU time: **8.223 µs**;
+- p95: **68.772 µs**;
+- p99: **228.509 µs**.
 
-2. **Formal soundness.** Are Theorems 1–5 actually implied by the stated operational rules and assumptions? Is any critical premise smuggled into A1–A5 so strongly that the theorem becomes tautological or uninteresting?
+## High-value review questions
 
-3. **Selection witness semantics.** Does “complete authorized evidence” have an operationally meaningful definition for prefix/extremum/aggregate selectors, especially when the provider may paginate, omit, reorder, or change data concurrently?
+1. **Selection novelty.** After SARA, Agent-Sentry, CaMeL, MiniScope, Task Shield, RACG/ContractGuard, and classic capability/authorization work, is the explicit candidate-selection relation `S(P,C,E)` a distinct technical contribution? Identify exact prior formal overlap if the answer is no.
 
-4. **Complete mediation.** Is the provider-effect boundary realistic enough to support the paper's security claim, and does the implementation evidence demonstrate that all protected provider mutation paths in the evaluation pass through it?
+2. **Clean causal isolation.** Does the full-versus-output-provenance comparison truly differ only in selection semantics at the two wrong-candidate probes? Look for hidden asymmetries that could explain the result.
 
-5. **Comparator fairness.** Are standing authority, output provenance, request/output provenance, and the single-trace field-wise allowlist appropriate internal baselines for isolating the contribution? What stronger reproducible comparator is essential before submission?
+3. **Formal correspondence.** Do Theorems 1–5 follow from the stated operational rules, and does the executable verifier implement the witness semantics used by the selection-soundness theorem?
 
-6. **External-system comparison.** Is it scientifically preferable that the repo avoids claiming approximate CaMeL/MiniScope/RACG reimplementations, or does a Q1 reviewer still require at least one faithful end-to-end external baseline?
+4. **Evidence completeness.** Are prefix/extremum/aggregate completeness checks defined tightly enough for the evaluated environment? If a stronger operational definition is required, specify it precisely.
 
-7. **Development circularity.** Does the 60-task AgentDojo cohort remain too entangled with grammar development despite the post-freeze suite? How much independent held-out/red-team evidence would be necessary to remove this objection?
+5. **Changed-evidence utility.** Does 36/36 acceptance demonstrate that the policy captures relations rather than literal reference values, and is the single-trace field-wise comparator a fair test of the opposing design choice?
 
-8. **Held-out wording.** Is “post-freeze author-generated held-out with respect to mechanism development” sufficiently precise, or should the paper avoid the word “held-out” entirely unless a third party authors the suite?
+6. **Structural authorization.** Do cardinality, precedence, tuple correlation, request non-derivation, and selection each represent independent policy dimensions in the implementation?
 
-9. **Transplant accounting.** Is excluding the known-invalid raw transplant generator from the publication-primary matrix methodologically sound given that the corrected exact-transplant audit blocks 33/33 and the provider-boundary family blocks 46/46? Does the diagnostic 5/33 raw allowance reveal any unaddressed mechanism flaw rather than generator invalidity?
+7. **Provider-boundary claim.** Does the 230/230 result measure actual effect admission rather than only intermediate trace classification? Confirm that rejected malicious trajectories cannot reach the protected provider mutation path in the evaluated runtime.
 
-10. **Attack independence.** Does mapping to OWASP Agentic Top 10 sufficiently reduce taxonomy circularity, or is an externally sourced mutation corpus required?
+8. **Related-work precision.** Is SARA represented fairly as the closest runtime-authorization neighbor? Does the manuscript correctly distinguish SARA's action-induction/execution-authorization framing from the resource-selection relation evaluated here?
 
-11. **Overhead.** Are the CPU decision numbers useful and reported honestly, given they exclude model/provider/storage/policy-generation/human costs? Which additional systems-cost number is necessary for publication?
+9. **Falsifiability.** Construct the strongest realistic case in which all candidates have legitimate output provenance but the full policy authorizes the wrong task-selected resource. If such a case succeeds under the stated model, it is a direct counterexample to the paper.
 
-12. **Live evidence.** Is demoting the incomplete DeepSeek matrix to a partial case study sufficient, or does the venue still require a balanced multi-model live experiment even though the deterministic/formal result is primary?
+10. **Submission decision.** Choose one: `ready`, `ready with manuscript-only changes`, `needs one targeted experiment`, or `not ready`. For every requested experiment, state the unresolved scientific question it would answer.
 
-13. **Claim scope.** Find any sentence in the package that could be interpreted as claiming prompt-injection prevention, arbitrary semantic compilation, production security, confidentiality protection, or broad model robustness beyond the evidence.
+## What constitutes a substantive rejection reason
 
-14. **Falsifiability.** What single experiment would most likely falsify the selection-authority contribution? Is that experiment already represented by the wrong-candidate, changed-winner, tie, incomplete-measurement, or self-authorization probes?
+A strong rejection reason should identify a concrete scientific failure, for example:
 
-15. **Q1 decision.** Choose one: `ready`, `ready with manuscript-only changes`, `needs one targeted experiment`, or `not ready`. Give the smallest blocking set and distinguish true blockers from nice-to-have extensions.
+- prior work already formalizes and directly evaluates the same multi-candidate selection-authorization relation;
+- the selection theorem and executable witness diverge;
+- the provenance comparator contains a hidden asymmetry unrelated to selection;
+- a realistic authorized-evidence trace produces the wrong selected resource under the full policy;
+- the provider-boundary test does not actually mediate the claimed protected mutation path;
+- the evaluation cannot distinguish relation-based dynamic authority from a simpler policy with the same semantics.
 
-## Known limitations — do not rediscover these as if hidden
+Requests for broader scale are most useful when they identify the specific uncertainty that scale resolves.
 
-The authors already acknowledge:
+## Reproduction checkpoint
 
-- post-freeze tasks are author-generated rather than independently authored;
-- formal proofs are not machine checked;
-- natural-language authority compilation is outside the proven boundary;
-- live model evidence is partial and not multi-model;
-- the monitor depends on complete mediation, evidence integrity, and witness correctness;
-- protected-effect authorization does not solve arbitrary data leakage/read-only/output safety;
-- external architectures are not approximated and mislabeled as faithful baselines.
+The immutable quantitative checkpoint used by the manuscript is:
 
-A useful review should say whether any of these is a **submission blocker**, not merely repeat them.
+- workflow run `33324959812`;
+- validated commit `cbe6f1077fc3a570e5d625f267005f52a7239fb9`;
+- artifact `9735953563`;
+- SHA-256 `bc53e9cf0ea94d458426a1b5d1732820c2fb11e08d9a8ee47b3438926a175ded`.
 
-## What would count as a high-value rejection reason
-
-A strong rejection reason would identify one of the following:
-
-- prior work already proves/evaluates essentially the same candidate-versus-selection authorization relation;
-- the selection theorem does not correspond to the implemented verifier;
-- a realistic trace authorized by the full policy violates the task-selected resource relation under the stated threat model;
-- the baseline result is caused by a hidden asymmetry unrelated to selection witnesses;
-- the post-freeze suite is too coupled to the implementation to provide any generalization evidence and a specific independent evaluation is indispensable;
-- a provider/evidence assumption invalidates the claimed enforcement boundary in the evaluated architecture.
-
-Generic requests for “more models,” “more attacks,” or “more baselines” should specify what scientific uncertainty the additional experiment resolves.
+Documentation and manuscript-polish commits retrigger the same offline gate. Use the latest green branch-head workflow for repository health and the checkpoint above to verify the reported quantitative tables.

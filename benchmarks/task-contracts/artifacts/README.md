@@ -1,14 +1,12 @@
 # Preserved Live-Evaluation Summaries
 
-This directory contains permanent machine-readable summaries of the paid DeepSeek V4 Pro evaluation attempts used by the V1 research closure.
+This directory contains compact machine-readable summaries for preserved DeepSeek V4 Pro evaluation runs.
 
 Files:
 
-- `attempt-3-summary.json` — partial canonical evidence; adaptive delivery failed before model execution;
-- `attempt-4-summary.json` — corrected adaptive delivery; partial Slack live result before API balance exhaustion.
+- `live-eval-run-33213651318-summary.json` — completed canonical rows from workflow run `33213651318`;
+- `live-eval-run-33216337865-summary.json` — completed matched Slack rows from workflow run `33216337865`.
 
-The original raw GitHub Actions ZIP artifacts are identified by run ID, artifact ID, head SHA, and SHA-256 digest in `../ARTIFACT_MANIFEST.md`.
+The original GitHub Actions artifacts are identified by run ID, artifact ID, head SHA, and SHA-256 digest in `../ARTIFACT_MANIFEST.md`.
 
-These summaries do not replace the historical failure record. Read `../LIVE_EVAL_ATTEMPTS.md` before interpreting them.
-
-For paper claims, use `../PAPER_RESULTS_DRAFT.md`.
+These files preserve aggregate evidence without requiring a paid model rerun. Use only completed matched rows for ungated-versus-gated comparisons.

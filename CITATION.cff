@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use Agent Authority or its V1 research artifacts, cite this repository and the exact commit used."
+message: "If you use Agent Authority, cite this repository and the exact commit used."
 title: "Agent Authority"
 type: software
 authors:
@@ -17,7 +17,7 @@ keywords:
   - "agent security"
   - "AgentDojo"
 abstract: >-
-  Agent Authority is a task-bounded execution layer for AI agents. The V1 research
-  package studies evidence-grounded dynamic resource authority and deterministic
-  selection witnesses under a fixed effect ceiling, with deterministic,
-  provider-boundary, and partial live-model evaluation artifacts.
+  Agent Authority is a task-bounded execution layer for AI agents. It narrows
+  provider access to task-local effects and resources using explicit authority,
+  evidence-derived facts, approvals, and provider-boundary enforcement. The
+  repository includes reproducible AgentDojo and provider-boundary evaluations.

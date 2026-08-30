@@ -10,8 +10,9 @@ jobs:
   archived:
     runs-on: ubuntu-latest
     steps:
-      - name: Paid evaluation archived
+      - name: Live evaluation archived
         run: |
-          echo "Paid DeepSeek evaluation is archived for this research slice."
-          echo "No model API calls are executed by this workflow."
-          echo "Final live evidence is recorded in benchmarks/task-contracts/PAPER_RESULTS_DRAFT.md and LIVE_EVAL_ATTEMPTS.md."
+          echo "This workflow preserves the historical live-evaluation entry point."
+          echo "No model API calls are executed."
+          echo "Aggregate evidence is documented in benchmarks/task-contracts/EVALUATION.md."
+          echo "Artifact identities are recorded in benchmarks/task-contracts/ARTIFACT_MANIFEST.md."

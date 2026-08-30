@@ -1,0 +1,143 @@
+name: Evaluation (Offline)
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/task-contracts/**"
+      - ".github/workflows/evaluation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install AgentDojo dependency
+        run: python -m pip install -r benchmarks/agentdojo/requirements.txt
+
+      - name: Syntax-check evaluation tools
+        run: |
+          node --check benchmarks/task-contracts/evaluation-policies.mjs
+          node --check benchmarks/task-contracts/generate-evaluation-matrix.mjs
+          node --check benchmarks/task-contracts/run-evaluation-baselines.mjs
+          node --check benchmarks/task-contracts/run-evaluation-stress.mjs
+          node --check benchmarks/task-contracts/benchmark-authorization-overhead.mjs
+
+      - name: Verify frozen mechanism
+        run: |
+          python benchmarks/task-contracts/validate-mechanism-freeze.py \
+            benchmarks/task-contracts/live-eval-freeze.json \
+            | tee /tmp/mechanism-freeze-validation.json
+
+      - name: Build 60-task cohort
+        run: |
+          python benchmarks/task-contracts/survey-agentdojo-coverage.py | tee /tmp/agentdojo-coverage.json
+          node benchmarks/task-contracts/build-agentdojo-expanded-cohort.mjs \
+            /tmp/agentdojo-coverage.json \
+            /tmp/agentdojo-cohort.json
+
+      - name: Run strict gate and exact-transplant audit
+        run: |
+          set +e
+          set -o pipefail
+          node benchmarks/task-contracts/run-strict-automatic-contract-pilot.mjs \
+            /tmp/agentdojo-cohort.json | tee /tmp/strict.json
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
+
+          node benchmarks/task-contracts/run-exact-transplant-audit.mjs \
+            /tmp/agentdojo-cohort.json \
+            | tee /tmp/transplants.json
+
+          node benchmarks/task-contracts/validate-expanded-strict-gate.mjs \
+            /tmp/strict.json \
+            /tmp/transplants.json \
+            | tee /tmp/strict-validated.json
+
+      - name: Run comparator matrix
+        run: |
+          set +e
+          set -o pipefail
+          node benchmarks/task-contracts/run-evaluation-baselines.mjs \
+            /tmp/agentdojo-cohort.json | tee /tmp/evaluation-baselines.json
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
+
+      - name: Run stress suite
+        run: |
+          set +e
+          set -o pipefail
+          node benchmarks/task-contracts/run-evaluation-stress.mjs \
+            | tee /tmp/evaluation-stress.json
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
+
+      - name: Benchmark authorization overhead
+        run: |
+          node benchmarks/task-contracts/benchmark-authorization-overhead.mjs \
+            /tmp/agentdojo-cohort.json 200 \
+            | tee /tmp/authorization-overhead.json
+
+      - name: Upload evaluation checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-offline-checkpoint
+          path: |
+            /tmp/mechanism-freeze-validation.json
+            /tmp/agentdojo-coverage.json
+            /tmp/agentdojo-cohort.json
+            /tmp/strict.json
+            /tmp/strict-validated.json
+            /tmp/transplants.json
+            /tmp/evaluation-baselines.json
+            /tmp/evaluation-stress.json
+            /tmp/authorization-overhead.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Require all evaluation gates
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const files = [
+            '/tmp/strict-validated.json',
+            '/tmp/evaluation-baselines.json',
+            '/tmp/evaluation-stress.json',
+            '/tmp/authorization-overhead.json'
+          ];
+          let failed = false;
+          for (const path of files) {
+            const value = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const go = value.go ?? value.valid ?? value.gates?.all;
+            if (go === false) {
+              failed = true;
+              console.error(`FAILED: ${path}`);
+              console.error(JSON.stringify(value.gates || value, null, 2));
+            } else {
+              console.log(`PASS: ${path}`);
+            }
+          }
+          if (failed) process.exit(2);
+          NODE

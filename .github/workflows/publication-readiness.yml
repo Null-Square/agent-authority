@@ -32,6 +32,7 @@ jobs:
         run: |
           node --check benchmarks/task-contracts/publication-policies.mjs
           node --check benchmarks/task-contracts/run-publication-baselines.mjs
+          node --check benchmarks/task-contracts/run-publication-baselines-v2.mjs
           node --check benchmarks/task-contracts/run-publication-heldout.mjs
           node --check benchmarks/task-contracts/benchmark-publication-overhead.mjs
 
@@ -39,11 +40,11 @@ jobs:
         run: |
           python benchmarks/task-contracts/validate-mechanism-freeze.py \
             benchmarks/task-contracts/live-eval-freeze.json \
-            > /tmp/live-eval-freeze-validation.json
+            | tee /tmp/live-eval-freeze-validation.json
 
       - name: Build frozen 60-task cohort
         run: |
-          python benchmarks/task-contracts/survey-agentdojo-coverage.py > /tmp/agentdojo-coverage-survey.json
+          python benchmarks/task-contracts/survey-agentdojo-coverage.py | tee /tmp/agentdojo-coverage-survey.json
           node benchmarks/task-contracts/build-agentdojo-expanded-cohort.mjs \
             /tmp/agentdojo-coverage-survey.json \
             /tmp/agentdojo-expanded-cohort.json
@@ -62,29 +63,43 @@ jobs:
 
           node benchmarks/task-contracts/run-exact-transplant-audit.mjs \
             /tmp/agentdojo-expanded-cohort.json \
-            > /tmp/task-contract-exact-transplants.json
+            | tee /tmp/task-contract-exact-transplants.json
 
           node benchmarks/task-contracts/validate-expanded-strict-gate.mjs \
             /tmp/task-contract-strict-expanded.json \
             /tmp/task-contract-exact-transplants.json \
-            > /tmp/task-contract-strict-expanded-validated.json
+            | tee /tmp/task-contract-strict-expanded-validated.json
 
       - name: Run publication baseline and ablation matrix
         run: |
-          node benchmarks/task-contracts/run-publication-baselines.mjs \
+          set +e
+          set -o pipefail
+          node benchmarks/task-contracts/run-publication-baselines-v2.mjs \
             /tmp/agentdojo-expanded-cohort.json \
-            > /tmp/publication-baselines.json
+            | tee /tmp/publication-baselines.json
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
 
       - name: Run post-freeze held-out stress suite
         run: |
+          set +e
+          set -o pipefail
           node benchmarks/task-contracts/run-publication-heldout.mjs \
-            > /tmp/publication-heldout.json
+            | tee /tmp/publication-heldout.json
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
 
       - name: Benchmark authorization decision overhead
         run: |
           node benchmarks/task-contracts/benchmark-publication-overhead.mjs \
             /tmp/agentdojo-expanded-cohort.json 200 \
-            > /tmp/publication-overhead.json
+            | tee /tmp/publication-overhead.json
 
       - name: Upload publication checkpoint
         uses: actions/upload-artifact@v4
@@ -102,3 +117,28 @@ jobs:
             /tmp/publication-overhead.json
           if-no-files-found: error
           retention-days: 30
+
+      - name: Require all publication gates
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const files = [
+            '/tmp/task-contract-strict-expanded-validated.json',
+            '/tmp/publication-baselines.json',
+            '/tmp/publication-heldout.json',
+            '/tmp/publication-overhead.json'
+          ];
+          let failed = false;
+          for (const path of files) {
+            const value = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const go = value.go ?? value.valid ?? value.gates?.all;
+            if (go === false) {
+              failed = true;
+              console.error(`FAILED: ${path}`);
+              console.error(JSON.stringify(value.gates || value, null, 2));
+            } else {
+              console.log(`PASS: ${path}`);
+            }
+          }
+          if (failed) process.exit(2);
+          NODE

@@ -1,268 +1,242 @@
-# Q1 Paper Blueprint — Selection Witnesses for Open-World Agent Authorization
+# Q1 Paper Blueprint — Selection Authority for Open-World Agents
 
-Status: submission-shaped source plan over the frozen V1 evidence plus the publication extension.
+Status: **manuscript draft created**. The primary paper source is now `MANUSCRIPT_Q1.md`; this file is the editorial/production guide.
 
-## Candidate title
+## Title
 
-**Selection Witnesses for Open-World Agent Authorization: When Provenance Is Not Authority**
+**Selection Authority for Open-World Agents: Authorizing the Chosen Resource at the Provider Boundary**
 
-Alternative:
+## Central thesis
 
-**Observation Is Not Authorization: Selection Witnesses for Dynamic Agent Authority**
+> A resource can be legitimately observed on an authorized execution path and still be unauthorized for a protected effect. When a task selects one resource from several legitimate candidates, the authorization layer must verify the task's selection relation, not merely the candidate's provenance.
 
-## One-sentence thesis
+This is the novelty axis to preserve throughout the paper.
 
-A secure tool-using agent may legitimately observe many resources during a task, but a protected effect on one resource should become authorized only when task-rooted evidence proves that the resource is the one selected by the user's predicate.
+## Why this framing is strong
 
-## Draft abstract
+The August 2026 literature check surfaced SARA, which independently separates action induction from runtime execution authorization. The manuscript therefore does not compete on the broad claim that provenance and authorization are different. It makes the narrower and cleaner contribution:
 
-Tool-using language-model agents often need to discover concrete resources only after execution begins. Granting standing account authority is over-broad, but freezing authorization to one successful trace is too restrictive when legitimate evidence changes. A further problem remains even when execution provenance is trusted: an authorized read may reveal multiple candidate resources, and observing a candidate does not establish that the user's task selected it for a later mutation. We call this distinction **selection authority**. We present Agent Authority, a stateful provider-effect reference monitor in which concrete resource authority may grow from verified authorized evidence while protected effect types remain under a fixed Mission ceiling. For ambiguous candidate sets, dynamic authority is granted only through deterministic selection witnesses that verify task-rooted predicates over the required evidence and fail closed on ties or incomplete measurements. We formalize the mechanism and prove Mission non-amplification, no request self-authorization, selection soundness, ambiguity fail-closed behavior, and cross-task non-transferability under explicit mediation and evidence-integrity assumptions. On a frozen 60-task AgentDojo development cohort, the full policy preserves 96/96 reference and changed-evidence executions while blocking 385/385 publication-primary adversarial traces. An otherwise structurally matched output-provenance policy preserves the same utility but authorizes both wrong observed selector candidates; permitting request provenance authorizes all 46 request self-authorization probes. On eight post-freeze author-generated task structures, the frozen mechanism preserves 13/13 legitimate executions and blocks 13/13 attacks while targeted ablations expose selection, cardinality, precedence, and tuple failures. The original provider-boundary evaluation blocks 230/230 constructible malicious trajectories with zero malicious provider reaches. A partial DeepSeek V4 Pro Slack evaluation provides live-model case-study evidence: among 372 matched attacked scenarios, ungated execution produces 61 policy-unauthorized protected effects across 40 scenarios whereas gated execution produces none. These results support selection witnesses as a distinct authorization primitive for open-world agent effects; they do not establish general prompt-injection prevention, automatic intent compilation, or broad multi-model robustness.
+**selection among multiple authorized candidates is itself an authorization relation.**
 
-## Contributions
+The strongest empirical isolation is:
 
-The introduction should make exactly four contribution claims.
+- full Agent Authority: **96/96** legitimate accepted, **385/385** publication-primary attacks blocked;
+- output provenance without selection witnesses: **96/96** legitimate accepted, but **2/2** wrong observed selector candidates authorized.
 
-1. **Problem/formal distinction — selection authority.** We isolate a failure mode not resolved by simple observation provenance: authorized execution can reveal multiple legitimate candidates, but candidate membership is not evidence that the task selected that candidate for mutation.
+Identical utility plus a selection-specific security difference is the result to emphasize first.
 
-2. **Mechanism — evidence-grounded dynamic authority under a fixed effect ceiling.** The reference monitor allows concrete task-local resource facts to grow only from trusted roots, verified authorized output, or deterministic selection witnesses; request occurrence does not derive authority.
+## Abstract structure
 
-3. **Formal result.** Under explicit complete-mediation, Mission-integrity, evidence-integrity, witness-correctness, and task-isolation assumptions, the system satisfies Mission non-amplification, no request self-authorization, selection soundness, ambiguity fail-closed behavior, and cross-task non-transferability.
+The abstract in `MANUSCRIPT_Q1.md` follows this order:
 
-4. **Falsification-oriented evaluation.** We compare full selection authority with structurally explicit weaker policies and targeted ablations, preserve changed-evidence utility, test post-freeze task structures, measure provider-boundary effects and CPU overhead, and retain a partial live-model case study without presenting it as the primary experiment.
+1. open-world runtime discovery creates unknown concrete resource identifiers;
+2. provenance does not distinguish among several legitimately observed candidates;
+3. define selection authority;
+4. present the fixed Mission ceiling + growing evidence-derived resource authority;
+5. state the formal properties;
+6. report the 96/96 versus 385/385 result and the provenance/request-provenance falsifications;
+7. report post-freeze and provider-boundary results;
+8. close with the conceptual principle.
 
-Do not add “prompt injection defense” as a fifth contribution.
+Keep the abstract focused on completed deterministic evidence. The live case study belongs in the evaluation rather than carrying the headline.
 
-## Research questions
+## Introduction structure
 
-**RQ1 — Selection necessity.** Does authorized observation of a candidate suffice to authorize a later protected effect on that candidate?
+Open with one concrete selector task:
 
-**RQ2 — Dynamic utility.** Can a fixed relation over authorized evidence permit a different legitimate winner/value when evidence changes without recompilation from the old concrete identifier?
+> “Message the user with the highest total message count.”
 
-**RQ3 — Structural necessity.** Which security properties are lost when selection witnesses, request non-derivation, cardinality, precedence, or tuple correlation are removed?
+Authorized reads return Alice, Bob, and Charlie. All three have valid provenance. Charlie is the unique aggregate winner. A provenance-only resource rule can authorize Alice even though the task selected Charlie.
 
-**RQ4 — Generalization.** Does the frozen mechanism preserve utility and safety on post-freeze task structures not used during grammar development?
+From that example, define four terms:
 
-**RQ5 — Provider-boundary relevance.** Do adversarial model trajectories actually produce out-of-policy protected effects that a provider-boundary authority layer can prevent?
+- effect authority;
+- resource/value authority;
+- observation provenance;
+- selection authority.
 
-## Recommended paper structure
+Then state the design problem: static literal authority rejects legitimate changed-evidence winners, while broad observation-derived authority lets the model choose among candidates.
+
+End with exactly four contributions:
+
+1. selection authority as a first-class resource authorization relation;
+2. stateful evidence-derived resource authority under a fixed Mission effect ceiling;
+3. theorem-backed security properties;
+4. falsification-oriented evaluation with provenance baselines, structural ablations, post-freeze stress, provider-boundary enforcement, and overhead measurement.
+
+## Recommended manuscript structure
 
 ### 1. Introduction
 
-Open with one concrete candidate-selection example, not the DeepSeek balance failure and not a generic prompt-injection paragraph.
+Lead with the multi-candidate counterexample and the 96/96 matched-utility falsification.
 
-Suggested running example:
+### 2. Problem Definition
 
-1. user asks: “message the user with the highest total message count”;
-2. authorized reads reveal Alice, Bob, and Charlie;
-3. Alice is legitimately observed;
-4. Charlie is the unique aggregate winner;
-5. provenance-only authorization permits Alice, even though the task selected Charlie;
-6. a selection witness authorizes Charlie only after complete measurements establish the unique winner.
+Define protected provider effects, open-world runtime discovery, observation-versus-selection, request circularity, and the five reference-monitor assumptions.
 
-End the introduction with the four contributions above.
+Place the assumptions here as the **system contract**, not as a late defensive qualification.
 
-### 2. Problem and threat model
-
-Define protected provider effects and explain why the model is untrusted at the mutation boundary.
-
-Separate:
-
-- effect authority: which mutation types may occur at all;
-- resource/value authority: which concrete targets/arguments may be used;
-- observation provenance: where a value was seen;
-- selection authority: why that value is the task-selected value.
-
-State A1–A5 up front and discuss deployment consequences of violating each assumption.
-
-### 3. Why provenance is insufficient
-
-Present two minimal counterexamples:
-
-- multi-candidate authorized output;
-- request self-authorization/circularity.
-
-Use the Slack-13 falsification as the empirical motivation after the abstract examples.
-
-### 4. Agent Authority model
-
-Present `M`, `A_t`, `H_t`, `C`, `P`, `E`, `S(P,C,E)` and the authorization transition.
-
-Explain that resource facts may grow while effect types do not.
-
-### 5. Selection witnesses
+### 3. Selection Authority
 
 Define:
 
-- prefix uniqueness;
-- max/min cardinality;
-- aggregate frequency;
-- fail-closed ties;
-- completeness requirements;
-- static fence fallback.
+- `M`, fixed Mission effect ceiling;
+- `A_t`, growing task-local resource authority;
+- `C`, candidate set;
+- `P`, task-rooted selector;
+- `E`, required authorized evidence;
+- `S(P,C,E)`, deterministic witness.
 
-Include one algorithm box for witness evaluation and one diagram for authority derivation.
+Make the invalid implication visually explicit:
 
-### 6. Formal properties
+`r ∈ C  ⇏  S(P,C,E)=r`.
 
-Promote Theorems 1–5 from `FORMAL_MODEL.md` into the manuscript.
+### 4. System Design
 
-The main theorem to emphasize is selection soundness. Mission non-amplification and request non-derivation establish the surrounding reference-monitor invariants.
+Describe provider-boundary mediation, evidence binding, task-local history, cardinality, precedence, tuple correlation, and witness evaluation.
 
-Do not claim arbitrary semantic selector completeness.
+Use the architecture diagram before implementation detail.
 
-### 7. Implementation
+### 5. Formal Properties
 
-Describe:
+Promote the five results from `FORMAL_MODEL.md`:
 
-- provider/action schema projection;
-- evidence bindings;
-- state/history;
-- selector verifier implementation;
-- tuple/cardinality/precedence enforcement;
-- provider-boundary gate;
-- frozen V1 mechanism and artifact integrity.
+1. Mission non-amplification;
+2. request non-self-authorization;
+3. selection soundness;
+4. ambiguity/incomplete-evidence fail closed;
+5. cross-task non-transferability.
 
-Keep product/API details out unless needed for reproducibility.
+Selection soundness is the central theorem. The others establish the reference-monitor invariants around it.
 
-### 8. Evaluation methodology
+### 6. Implementation
 
-Subsections:
+Keep this section mechanical and reproducible. Explain the contract projection, evidence bindings, selector verifier, state/history, tuple/cardinality/precedence checks, freeze manifest, and provider gate.
 
-1. frozen 60-task AgentDojo development cohort;
-2. internal comparator semantics;
-3. adversarial families and OWASP mapping;
-4. post-freeze author-generated stress suite;
-5. provider-boundary families;
-6. partial live-model case study;
-7. overhead methodology.
+### 7. Evaluation
 
-Explicitly distinguish development, post-freeze, and independent evidence. There is no independent third-party held-out set in the current package.
+Use five RQs:
 
-### 9. Main results
+- RQ1: selection necessity;
+- RQ2: changed-evidence utility;
+- RQ3: structural necessity;
+- RQ4: post-freeze behavior;
+- RQ5: provider-boundary relevance.
 
-Lead with a table comparing the internal policies, not the DeepSeek experiment.
+Lead with the internal comparator table. Follow with changed-evidence utility, request circularity, structural ablations, post-freeze stress, provider boundary, live matched case study, and CPU overhead.
 
-#### Table 1 — utility/safety comparison
+### 8. Related Work
+
+Organize by mechanism rather than chronology:
+
+- runtime authorization/action provenance — **SARA** first;
+- authorization-sensitive model behavior — provenance-sensitivity audit;
+- structural prompt-injection defenses — CaMeL;
+- least privilege — MiniScope;
+- semantic task alignment — Task Shield;
+- execution provenance/behavioral bounds — Agent-Sentry;
+- contract/capability gating — RACG/ContractGuard;
+- attenuating delegation tokens.
+
+The key novelty paragraph should say:
+
+> Recent systems increasingly move security decisions outside the model and distinguish runtime evidence from execution authority. Agent Authority isolates a finer-grained authorization question: when an authorized execution returns several legitimate candidates, what proves that one candidate is the task-selected target? We model that proof obligation directly as `S(P,C,E)` and evaluate it against a structurally matched provenance-only policy.
+
+### 9. Design Implications
+
+Use this section to generalize the contribution positively:
+
+- authorization policies are often relations, not independent value sets;
+- dynamic authority does not require broad standing authority;
+- evidence completeness is part of selector authorization;
+- provider-boundary mediation composes with upstream defenses;
+- deterministic witnesses are compact auditable proof objects.
+
+### 10. Conclusion
+
+End on the conceptual claim:
+
+> For dynamic agent effects, authority must capture not only where a resource came from, but why that resource is the one the task chose.
+
+## Figures
+
+The current manuscript contains three Mermaid figures that render directly on GitHub.
+
+### Figure 1 — Observation provenance versus selection authority
+
+Authorized read returns three candidates. Provenance marks all as legitimate. The selector witness authorizes only the unique task-selected winner.
+
+**Purpose:** make the core contribution understandable in one glance.
+
+### Figure 2 — Provider-boundary architecture
+
+User task/Mission and the LLM feed the Agent Authority gate. Verified provider output enters task-scoped evidence. The witness verifier derives dynamic authority. Protected effects execute only after the gate.
+
+**Purpose:** show that the model proposes but the trusted monitor authorizes.
+
+### Figure 3 — Fixed effect ceiling, growing resource authority
+
+Show `M` unchanged across task states while `A_t` grows from roots, verified evidence, and selection witnesses.
+
+**Purpose:** visualize dynamic least privilege without effect amplification.
+
+For a camera-ready version, redraw these three diagrams as vector figures while preserving their semantics and labels.
+
+## Main tables
+
+### Table 1 — Policy comparison
 
 | Policy | Legitimate | Attacks blocked |
 | --- | ---: | ---: |
-| full Agent Authority | **96/96** | **385/385** |
-| standing action | 96/96 | 60/385 |
-| output provenance | 96/96 | 383/385 |
+| **Agent Authority — full** | **96/96** | **385/385** |
+| standing action authority | 96/96 | 60/385 |
+| output provenance | **96/96** | 383/385 |
 | request/output provenance | 96/96 | 337/385 |
 | single-trace field-wise value allowlist | 61/96 | 252/385 |
 
-Immediately explain that output provenance differs from full authority on exactly the two generated wrong-selector probes while preserving identical legitimate acceptance.
+The prose immediately after this table should focus on the full-vs-output-provenance pair.
 
-#### Table 2 — ablations
+### Table 2 — Structural ablations
 
-Report family-specific exposure rather than only aggregate rates:
+Report the isolated exposures:
 
 - no cardinality → 60/60 repeats authorized;
 - no precedence → 24/59 reorder mutants authorized;
 - no tuples → 12/12 cross-products authorized;
-- request provenance → 46/46 self-auth probes authorized;
+- request provenance → 46/46 self-authorization probes authorized;
 - output provenance without selection → 2/2 wrong candidates authorized.
 
-#### Table 3 — post-freeze suite
+### Table 3 — Post-freeze structures
 
-Full policy: 13/13 legitimate; 13/13 attacks blocked. Include weaker policy results and explicitly label authorship.
+Full policy: 13/13 legitimate accepted and 13/13 attacks blocked. Show weaker policies in the same table.
 
-#### Table 4 — provider-boundary and live case study
+### Table 4 — Provider boundary
 
-Keep the 230/230 end-to-end deterministic result and the partial 372 matched DeepSeek case study separate.
+Lead with 230/230 malicious trajectories blocked and zero malicious provider reaches.
 
-### 10. Related work
+### Table 5 — CPU overhead
 
-Organize by mechanism, not by paper chronology:
+Median authorization decision: 8.223 µs; p95 68.772 µs; p99 228.509 µs.
 
-- structural prompt-injection defenses/control-flow systems: CaMeL;
-- least-privilege tool authorization: MiniScope;
-- semantic task-alignment defenses: Task Shield;
-- learned trace/provenance bounding: Agent-Sentry;
-- causal/tool-exposure gating and contract integrity: RACG/ContractGuard;
-- classic capability, information-flow, reference-monitor, and authorization concepts.
+## Precision rules
 
-The novelty paragraph should say:
+Use these rules to keep the paper strong and difficult to attack:
 
-> These systems motivate structural confinement, least privilege, task alignment, provenance, and trusted tool contracts. Our narrower question arises after a tool/read is already legitimate: when it returns several candidate resources, what evidence authorizes one candidate for a later protected effect? Agent Authority treats candidate membership as insufficient and requires a deterministic witness for the task selection relation.
+1. Claim novelty for **selection authority**, not for generic least privilege, provenance tracking, or the broad action-induction/execution-authorization split.
+2. Describe SARA as the closest current runtime-authorization neighbor.
+3. Describe internal baselines by their actual semantics, not by external system names.
+4. Use **single-trace field-wise value allowlist**, not “exact-trace baseline.”
+5. State the reference-monitor assumptions once in the problem definition and build the theorems from them.
+6. Keep the live model result as a supporting provider-boundary case study; do not let it dominate the abstract or contribution list.
+7. Use completed evaluation populations with explicit denominators in every quantitative claim.
+8. Emphasize relational policy structure: selection, tuple correlation, cardinality, and precedence.
 
-Do not claim prior systems cannot represent selection authority unless their formalism has been checked carefully. Claim instead that the paper isolates and evaluates this relation explicitly.
+## Submission production pass
 
-### 11. Limitations and negative results
+Before venue formatting:
 
-Preserve all uncomfortable facts:
-
-- single live model family/partial Slack slice;
-- post-freeze set author-generated;
-- proof assumptions and no machine checking;
-- no arbitrary natural-language intent compiler;
-- protected effects only;
-- exact trace/value over-constraint negative result;
-- dependence on complete evidence for selection;
-- concurrent/paginated provider evidence as an open systems problem;
-- external systems not faithfully reproduced as baselines.
-
-### 12. Conclusion
-
-Conclude on the conceptual point, not the attack block percentage:
-
-> Secure dynamic authority requires evidence not only of where a resource came from, but why that resource—not another observed candidate—is authorized for the effect.
-
-## Figures required for submission
-
-### Figure 1 — candidate observation vs selection authority
-
-Left: authorized read returns A/B/C; provenance highlights all three; unsafe provenance-only mutation can target any candidate.
-
-Right: task predicate + complete evidence → unique winner B → dynamic authority only for B.
-
-### Figure 2 — reference-monitor architecture
-
-User task/Mission → agent/model → reads/evidence → witness/authority state → protected provider gate → provider. Show the model and untrusted content outside the TCB; show Mission/evidence verifier/witness/gate inside.
-
-### Figure 3 — authority transition
-
-Show fixed `M` and growing `A_t`, emphasizing that concrete resource facts may grow while effect types remain bounded.
-
-### Figure 4 — evaluation layers
-
-Development cohort → post-freeze stress → provider-boundary → partial live case study. Visually prevent readers from conflating complete deterministic coverage with partial live coverage.
-
-## Tables required for submission
-
-1. threat model and trusted assumptions;
-2. comparator semantics;
-3. main 96/96 vs 385/385 matrix;
-4. ablation family exposures;
-5. post-freeze suite;
-6. provider-boundary families;
-7. live matched case study;
-8. CPU overhead;
-9. closest related-work mechanism comparison.
-
-## Claims to avoid
-
-Never write:
-
-- “solves prompt injection”;
-- “provably secure agent” without immediately delimiting the proven protected-effect model and assumptions;
-- “held-out independent benchmark” for the post-freeze author-generated suite;
-- “exact trace baseline” unless referring historically and clarifying the actual implementation;
-- “CaMeL/MiniScope baseline” for an approximate internal policy;
-- “multi-model robust”;
-- “all attacks blocked” without naming the evaluated attack population;
-- “zero overhead”;
-- “automatic intent understanding.”
-
-## Submission decision rule
-
-The package is suitable for an external Q1-readiness review when:
-
-- publication CI is green on the latest branch head;
-- the freeze validator is green;
-- `PUBLICATION_RESULTS.md` matches the machine-readable checkpoint;
-- reviewer handoff exposes the known limitations rather than hiding them;
-- the reviewer can reproduce all new quantitative tables without paid model calls.
-
-A Q1 reviewer may still require an independently authored task/red-team set or one faithful external baseline. Those are the two most plausible remaining experimental blockers; they should be demanded only if the review explains which unresolved scientific uncertainty they address.
+- convert Mermaid diagrams to publication-quality vector figures;
+- convert numbered references to BibTeX and venue citation style;
+- move reproducibility identifiers and full attack-family enumeration to the artifact appendix if page pressure requires;
+- keep the selection example, main comparator table, formal selection theorem, and provider-boundary result in the main paper;
+- verify every manuscript number against `PUBLICATION_RESULTS.md` and the latest green publication checkpoint.
